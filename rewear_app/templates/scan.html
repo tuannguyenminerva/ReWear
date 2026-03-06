@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ReWear — Scan Look</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='scan.css') }}">
+</head>
+<body>
+
+<h1>ReWear — Scan Your Look</h1>
+<p class="sub">Use camera or upload a photo to log your outfit</p>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchMode('camera')">Camera</button>
+  <button class="tab" onclick="switchMode('upload')">Upload Photo</button>
+</div>
+
+<!-- Camera panel -->
+<div class="panel active" id="panelCamera">
+  <div class="viewfinder">
+    <span class="placeholder" id="placeholder">Camera off</span>
+    <video id="video" autoplay playsinline muted style="display:none;"></video>
+    <img id="snapshot" style="display:none;" alt="captured">
+    <span class="live-badge" id="liveBadge">● LIVE</span>
+  </div>
+  <div class="btn-row">
+    <button class="primary" id="btnStart" onclick="startCamera()">Start Camera</button>
+    <button id="btnFlip" onclick="flipCamera()" disabled>Flip</button>
+    <button id="btnCapture" onclick="capturePhoto()" disabled>Capture</button>
+    <button id="btnRetake" onclick="retakePhoto()" disabled>Retake</button>
+  </div>
+  <button class="full primary" id="btnUseCamera" onclick="usePhoto('camera')" disabled>Use this photo</button>
+</div>
+
+<!-- Upload panel -->
+<div class="panel" id="panelUpload">
+  <img id="uploadPreview" class="upload-preview" alt="preview">
+  <div class="upload-zone" id="uploadZone">
+    <input type="file" accept="image/*" id="fileInput" onchange="handleFile(event)">
+    <p>Click to browse or drag &amp; drop an image<br><small>JPG, PNG, WEBP</small></p>
+  </div>
+  <div class="btn-row" id="uploadActions" style="display:none;">
+    <button onclick="clearUpload()">Clear</button>
+    <button class="primary" onclick="usePhoto('upload')">Use this photo</button>
+  </div>
+</div>
+
+<!-- Result -->
+<div id="resultSection">
+  <h2>Ready to send to backend</h2>
+  <img id="resultThumb" alt="look">
+  <div class="meta">
+    <div class="meta-item"><div class="label">Source</div><div id="metaSource">—</div></div>
+    <div class="meta-item"><div class="label">Captured at</div><div id="metaTime">—</div></div>
+    <div class="meta-item"><div class="label">Est. size</div><div id="metaSize">—</div></div>
+    <div class="meta-item"><div class="label">Status</div><div>Ready</div></div>
+  </div>
+  <div class="btn-row">
+    <button onclick="resetAll()">Start over</button>
+    <button class="primary" onclick="submitLook()">Send to AI pipeline</button>
+  </div>
+</div>
+
+<canvas id="canvas"></canvas>
+<div class="toast" id="toast"></div>
+
+<script src="{{ url_for('static', filename='scan.js') }}"></script>
+</body>
+</html>

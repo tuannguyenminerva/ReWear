@@ -1,0 +1,55 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: sans-serif; background: #fff; color: #000; padding: 24px; max-width: 600px; margin: 0 auto; }
+h1 { font-size: 20px; margin-bottom: 4px; }
+p.sub { font-size: 13px; color: #666; margin-bottom: 24px; }
+
+.tabs { display: flex; border: 1px solid #000; margin-bottom: 20px; }
+.tab { flex: 1; padding: 10px; background: #fff; border: none; cursor: pointer; font-size: 14px; }
+.tab.active { background: #000; color: #fff; }
+.tab + .tab { border-left: 1px solid #000; }
+
+.panel { display: none; }
+.panel.active { display: block; }
+
+.viewfinder {
+  width: 100%; aspect-ratio: 4/3; background: #eee; border: 1px solid #ccc;
+  position: relative; overflow: hidden; margin-bottom: 12px;
+  display: flex; align-items: center; justify-content: center;
+}
+.viewfinder video, .viewfinder img { width: 100%; height: 100%; object-fit: cover; display: block; position: absolute; inset: 0; }
+.viewfinder .placeholder { font-size: 13px; color: #888; }
+.live-badge {
+  position: absolute; top: 10px; left: 10px; z-index: 2;
+  background: #000; color: #fff; font-size: 11px; padding: 3px 8px; display: none;
+}
+.live-badge.visible { display: block; }
+
+.btn-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+button { padding: 10px 16px; font-size: 13px; cursor: pointer; border: 1px solid #000; background: #fff; color: #000; }
+button.primary { background: #000; color: #fff; }
+button:disabled { opacity: 0.35; cursor: default; }
+.full { width: 100%; }
+
+.upload-zone {
+  border: 2px dashed #999; padding: 40px 20px; text-align: center;
+  cursor: pointer; margin-bottom: 12px; position: relative;
+}
+.upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.upload-zone p { font-size: 14px; color: #555; }
+.upload-zone.drag-over { border-color: #000; background: #f5f5f5; }
+.upload-preview { width: 100%; aspect-ratio: 4/3; object-fit: cover; border: 1px solid #ccc; margin-bottom: 12px; display: none; }
+
+#resultSection { display: none; border: 1px solid #ccc; padding: 16px; margin-top: 24px; }
+#resultSection h2 { font-size: 15px; margin-bottom: 12px; }
+#resultThumb { width: 100%; max-height: 240px; object-fit: cover; display: block; margin-bottom: 12px; border: 1px solid #eee; }
+.meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; font-size: 13px; }
+.meta-item { background: #f5f5f5; padding: 8px; }
+.meta-item .label { font-size: 11px; color: #888; margin-bottom: 2px; }
+
+canvas { display: none; }
+.toast {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  background: #000; color: #fff; padding: 8px 16px; font-size: 13px;
+  opacity: 0; transition: opacity 0.3s; pointer-events: none; white-space: nowrap;
+}
+.toast.show { opacity: 1; }
