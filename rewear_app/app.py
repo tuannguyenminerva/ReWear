@@ -1,4 +1,5 @@
 import os
+import uuid
 from flask import Flask, request, jsonify, session
 from flask_cors import CORS
 from models import db, User, Item, Outfit, OutfitItem
@@ -40,11 +41,9 @@ def item_to_dict(item):
     wear_count = len(item.outfit_items)
     last_worn = None
     if item.outfit_items:
-        dates = [
-            Outfit.query.get(oi.outfit_id).worn_date
-            for oi in item.outfit_items
-        ]
-        last_worn = max(dates).isoformat()
+        outfits = [Outfit.query.get(oi.outfit_id) for oi in item.outfit_items]
+        dates = [o.worn_date for o in outfits if o is not None]
+        last_worn = max(dates).isoformat() if dates else None
     return {
         "id": str(item.id),
         "name": item.name,
@@ -222,7 +221,8 @@ def create_outfit():
         image_path = None
         if "image" in request.files:
             f = request.files["image"]
-            filename = f"{user.id}_{int(__import__('time').time())}_{f.filename}"
+            ext = os.path.splitext(f.filename)[1] if f.filename else '.jpg'
+            filename = f"{uuid.uuid4().hex}{ext}"
             save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
             f.save(save_path)
             image_path = f"/uploads/{filename}"
