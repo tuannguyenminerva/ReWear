@@ -1,0 +1,7 @@
+{
+  "name": "Remix: Remix: Rewear",
+  "description": "A desktop-first wardrobe tracking app featuring real-time clothing detection, wardrobe management, and usage insights.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
