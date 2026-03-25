@@ -1,6 +1,9 @@
-instance/
+venv/
 __pycache__/
 *.pyc
+rewear_app/uploads/
+.env
+instance/
 
 # Python virtual environments
 venv/

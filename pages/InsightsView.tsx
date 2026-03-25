@@ -181,21 +181,27 @@ export const InsightsView: React.FC = () => {
           {/* Most Worn Item - Less Overwhelming */}
           <div className="bg-white p-8 rounded-2xl border border-stone-100 shadow-sm flex flex-col h-[480px]">
             <p className="text-stone-400 font-bold uppercase text-[10px] tracking-widest mb-4">Most Worn Item</p>
-            <h3 className="text-xl font-bold text-stone-800 mb-6">{mostWorn.name}</h3>
-            
-            <div className="flex-1 aspect-square rounded-xl overflow-hidden mb-6 bg-stone-50 border border-stone-100">
-              <img src={mostWorn.image} alt={mostWorn.name} className="w-full h-full object-cover" />
-            </div>
-
-            <div className="flex justify-between items-end">
-              <div>
-                <span className="text-3xl font-bold text-primary-500">{mostWorn.wearCount}</span>
-                <span className="text-stone-400 text-sm ml-1">wears</span>
+            {mostWorn ? (
+              <>
+                <h3 className="text-xl font-bold text-stone-800 mb-6">{mostWorn.name}</h3>
+                <div className="flex-1 aspect-square rounded-xl overflow-hidden mb-6 bg-stone-50 border border-stone-100">
+                  <img src={mostWorn.image} alt={mostWorn.name} className="w-full h-full object-cover" />
+                </div>
+                <div className="flex justify-between items-end">
+                  <div>
+                    <span className="text-3xl font-bold text-primary-500">{mostWorn.wearCount}</span>
+                    <span className="text-stone-400 text-sm ml-1">wears</span>
+                  </div>
+                  <button className="px-4 py-2 bg-stone-900 text-white rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-primary-600 transition-colors">
+                    Details
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-stone-300 font-serif italic">
+                No items yet
               </div>
-              <button className="px-4 py-2 bg-stone-900 text-white rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-primary-600 transition-colors">
-                Details
-              </button>
-            </div>
+            )}
           </div>
 
           {/* Recent Outfits */}

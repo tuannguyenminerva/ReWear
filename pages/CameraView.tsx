@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Camera, Check, Loader2, Upload, Edit2, X, Search } from 'lucide-react';
+import { Camera, Check, Plus, Loader2, Upload, Calendar, Edit2, X, Search } from 'lucide-react';
 import { useWardrobe } from '../WardrobeContext';
 import { ClothingItem } from '../types';
 
@@ -18,6 +18,7 @@ export const CameraView: React.FC = () => {
   const [isLogSuccess, setIsLogSuccess] = useState(false);
   const [permissionError, setPermissionError] = useState(false);
 
+  // We keep both a preview URL and the raw File so we can upload it
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
 
@@ -27,37 +28,6 @@ export const CameraView: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [logError, setLogError] = useState('');
-  const [apiError, setApiError] = useState<string | null>(null);
-  const [noDetectionMsg, setNoDetectionMsg] = useState(false);
-
-  // ── Real AI Detection ────────────────────────────────────────────────────────
-  const runDetection = async (imageB64: string) => {
-    setIsDetecting(true);
-    setApiError(null);
-    setNoDetectionMsg(false);
-    try {
-      const res = await fetch(DETECT_API, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: imageB64 }),
-      });
-      if (!res.ok) {
-        setApiError(`Server error (${res.status})`);
-        return;
-      }
-      const data = await res.json();
-      if (data.detections && data.detections.length > 0) {
-        setDetectedItems(data.detections as ClothingItem[]);
-      } else {
-        setNoDetectionMsg(true);
-        setTimeout(() => setNoDetectionMsg(false), 3000);
-      }
-    } catch {
-      setApiError("Can't reach Flask server — make sure it's running on port 5001");
-    } finally {
-      setIsDetecting(false);
-    }
-  };
 
   // ── Camera ──────────────────────────────────────────────────────────────────
   const startCamera = async () => {
@@ -92,46 +62,37 @@ export const CameraView: React.FC = () => {
     ctx.translate(canvas.width, 0);
     ctx.scale(-1, 1);
     ctx.drawImage(video, 0, 0);
-
-    // Send base64 to detection API
-    runDetection(canvas.toDataURL('image/jpeg', 0.85));
-
-    // Also store as File/preview so the captured frame is shown and can be saved with the outfit
     canvas.toBlob(blob => {
       if (!blob) return;
       const file = new File([blob], `capture_${Date.now()}.jpg`, { type: 'image/jpeg' });
+      const url = URL.createObjectURL(blob);
       setUploadedFile(file);
-      setUploadedImage(URL.createObjectURL(blob));
+      setUploadedImage(url);
+      // Simulate detection on captured frame
+      triggerDetection();
     }, 'image/jpeg', 0.85);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-scan every 5 s while live camera is running
+  // ── Detection simulation ────────────────────────────────────────────────────
+  const triggerDetection = useCallback(() => {
+    setIsDetecting(true);
+    setTimeout(() => {
+      const count = Math.floor(Math.random() * 3) + 2;
+      const shuffled = [...wardrobe].sort(() => 0.5 - Math.random());
+      setDetectedItems(shuffled.slice(0, count));
+      setIsDetecting(false);
+    }, 1500);
+  }, [wardrobe]);
+
+  // Auto-detect every 4 s while live camera is running (no uploaded image)
   useEffect(() => {
     if (permissionError || uploadedImage || isLogSuccess) return;
-
-    const firstScan = setTimeout(() => {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      if (!video || !canvas || video.readyState < 2) return;
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      ctx.translate(canvas.width, 0);
-      ctx.scale(-1, 1);
-      ctx.drawImage(video, 0, 0);
-      runDetection(canvas.toDataURL('image/jpeg', 0.85));
-    }, 1500);
-
     const interval = setInterval(() => {
       if (editingItemId) return;
-      captureFrame();
-    }, 5000);
-
-    return () => { clearTimeout(firstScan); clearInterval(interval); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [permissionError, uploadedImage, isLogSuccess, editingItemId, captureFrame]);
+      triggerDetection();
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [permissionError, uploadedImage, isLogSuccess, editingItemId, triggerDetection]);
 
   // ── File upload ─────────────────────────────────────────────────────────────
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -139,10 +100,7 @@ export const CameraView: React.FC = () => {
     const file = e.target.files[0];
     setUploadedFile(file);
     setUploadedImage(URL.createObjectURL(file));
-
-    const reader = new FileReader();
-    reader.onload = () => runDetection(reader.result as string);
-    reader.readAsDataURL(file);
+    triggerDetection();
   };
 
   // ── Log outfit ──────────────────────────────────────────────────────────────
@@ -228,18 +186,6 @@ export const CameraView: React.FC = () => {
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 border border-white/30 rounded-full animate-pulse" />
             </div>
 
-            {/* Status banners */}
-            {apiError && (
-              <div className="absolute top-6 left-1/2 -translate-x-1/2 z-30 bg-red-500/90 text-white text-xs font-bold px-4 py-2 rounded-full backdrop-blur-sm">
-                {apiError}
-              </div>
-            )}
-            {noDetectionMsg && !apiError && (
-              <div className="absolute top-6 left-1/2 -translate-x-1/2 z-30 bg-black/60 text-white/80 text-xs px-4 py-2 rounded-full backdrop-blur-sm">
-                No clothing detected — try moving closer or adjusting lighting
-              </div>
-            )}
-
             {/* Bounding Box Labels */}
             {!isLogSuccess && detectedItems.map((item, idx) => {
               const top = 20 + (idx * 15);
@@ -272,9 +218,9 @@ export const CameraView: React.FC = () => {
             <Upload size={14} /> Upload
           </button>
           {!uploadedImage && !permissionError && (
-            <button onClick={captureFrame} disabled={isDetecting}
-              className="flex items-center gap-2 px-5 py-2.5 bg-primary-500/90 backdrop-blur-md border border-primary-400 text-white rounded-full text-xs font-bold uppercase tracking-widest hover:bg-primary-600 transition-all disabled:opacity-50">
-              <Camera size={14} /> {isDetecting ? 'Scanning…' : 'Capture'}
+            <button onClick={captureFrame}
+              className="flex items-center gap-2 px-5 py-2.5 bg-primary-500/90 backdrop-blur-md border border-primary-400 text-white rounded-full text-xs font-bold uppercase tracking-widest hover:bg-primary-600 transition-all">
+              <Camera size={14} /> Capture
             </button>
           )}
         </div>

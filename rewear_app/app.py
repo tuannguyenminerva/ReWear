@@ -5,10 +5,6 @@ from flask import Flask, request, jsonify, session, render_template
 from flask_cors import CORS
 from models import db, User, Item, Outfit, OutfitItem
 from datetime import date
-from detector import detect_clothing
-import cv2
-import numpy as np
-
 app = Flask(__name__)
 
 # ── Configuration ─────────────────────────────────────────────────────────────
@@ -21,7 +17,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 db.init_app(app)
-CORS(app, supports_credentials=True, origins=["http://localhost:3000", "http://localhost:5173"])
+CORS(app, supports_credentials=True, origins=["http://localhost:3000"])
 
 with app.app_context():
     db.create_all()
@@ -180,6 +176,7 @@ def update_item(item_id):
     for field in ("name", "category", "color", "brand", "cost", "image_path"):
         if field in data:
             setattr(item, field, data[field])
+    # allow frontend to send 'image' key too
     if "image" in data:
         item.image_path = data["image"]
     db.session.commit()
@@ -216,6 +213,7 @@ def create_outfit():
     if err:
         return err
 
+    # Support multipart (with image) or JSON
     if request.content_type and "multipart" in request.content_type:
         worn_date_str = request.form.get("date")
         item_ids = request.form.getlist("item_ids")
@@ -242,7 +240,7 @@ def create_outfit():
 
     outfit = Outfit(worn_date=worn_date, notes=notes, image_path=image_path, user_id=user.id)
     db.session.add(outfit)
-    db.session.flush()
+    db.session.flush()  # get outfit.id
 
     for iid in item_ids:
         item = Item.query.filter_by(id=int(iid), user_id=user.id).first()
@@ -260,42 +258,48 @@ def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
 
-# ── AI Detection ──────────────────────────────────────────────────────────────
-@app.route("/api/detect", methods=["POST"])
-def detect():
-    data = request.get_json()
-    if not data or "image" not in data:
-        return jsonify({"error": "No image provided"}), 400
-
-    try:
-        image_b64 = data["image"]
-        if "," in image_b64:
-            image_b64 = image_b64.split(",", 1)[1]
-
-        # Reject images over 10 MB
-        MAX_BYTES = 10 * 1024 * 1024
-        if len(image_b64) * 3 // 4 > MAX_BYTES:
-            return jsonify({"error": "Image too large (max 10 MB)"}), 413
-
-        image_bytes = base64.b64decode(image_b64)
-        nparr = np.frombuffer(image_bytes, np.uint8)
-        image_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-
-        if image_bgr is None:
-            return jsonify({"error": "Could not decode image"}), 400
-
-        image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
-        detections = detect_clothing(image_rgb)
-        return jsonify({"detections": detections})
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
 @app.route("/scan")
 def scan():
     return render_template("scan.html")
 
+@app.route("/outfit/scan", methods=["POST"])
+def scan_outfit():
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"error": "Not authenticated"}), 401
+
+    data = request.get_json()
+    if not data or "image" not in data:
+        return jsonify({"error": "No image provided"}), 400
+
+    # Decode base64 image from frontend
+    image_data = data["image"].split(",")[1]
+    image_bytes = base64.b64decode(image_data)
+
+    # Save to disk
+    os.makedirs("uploads", exist_ok=True)
+    filename = f"{uuid.uuid4().hex}.jpg"
+    filepath = os.path.join("uploads", filename)
+
+    with open(filepath, "wb") as f:
+        f.write(image_bytes)
+
+    # Create Outfit record
+    outfit = Outfit(
+        image_path=filepath,
+        user_id=user_id,
+        ai_status="pending"
+    )
+    db.session.add(outfit)
+    db.session.commit()
+
+    return jsonify({
+        "message": "Outfit saved",
+        "outfit_id": outfit.id,
+        "image_path": filepath
+    }), 201
+
+
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5001)
+    app.run(debug=True)
