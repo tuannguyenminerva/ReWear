@@ -3,6 +3,8 @@ import { Camera, Check, Plus, Loader2, Upload, Calendar, Edit2, X, Search } from
 import { useWardrobe } from '../WardrobeContext';
 import { ClothingItem } from '../types';
 
+const DETECT_API = "http://localhost:5001/api/detect";
+
 export const CameraView: React.FC = () => {
   const { wardrobe, addOutfit } = useWardrobe();
   const videoRef = useRef<HTMLVideoElement>(null);

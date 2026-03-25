@@ -5,6 +5,17 @@ rewear_app/uploads/
 .env
 instance/
 
+# Python virtual environments
+venv/
+.venv/
+env/
+
+# ML model weight files (large binaries, auto-downloaded at runtime)
+*.pt
+*.pth
+*.onnx
+*.bin
+
 # Logs
 logs
 *.log
