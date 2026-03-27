@@ -105,3 +105,11 @@ export const outfitsApi = {
     });
   },
 };
+
+export const detectionApi = {
+  detect: (imageB64: string) =>
+    request<{ detections: any[] }>('/api/detect', {
+      method: 'POST',
+      body: JSON.stringify({ image: imageB64 }),
+    }),
+};

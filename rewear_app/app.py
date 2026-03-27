@@ -5,12 +5,19 @@ from flask import Flask, request, jsonify, session, render_template
 from flask_cors import CORS
 from models import db, User, Item, Outfit, OutfitItem
 from datetime import date
+from detector import detect_clothing 
+import cv2
+import numpy as np
+
 app = Flask(__name__)
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 app.config['SECRET_KEY'] = 'dev-secret-key'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'
+app.config['SESSION_COOKIE_SECURE'] = False
+app.config['SESSION_COOKIE_HTTPONLY'] = True
 
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -149,13 +156,28 @@ def create_item():
     if not data or not data.get("name"):
         return jsonify({"error": "name is required"}), 400
 
+    image_val = data.get("image", "")
+    if image_val and image_val.startswith("data:image/"):
+        try:
+            mime_part, b64_part = image_val.split(",", 1)
+            ext = ".jpg"
+            if "png" in mime_part: ext = ".png"
+            image_bytes = base64.b64decode(b64_part)
+            filename = f"crop_{uuid.uuid4().hex}{ext}"
+            save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+            with open(save_path, "wb") as f:
+                f.write(image_bytes)
+            image_val = f"/uploads/{filename}"
+        except Exception as e:
+            print(f"Failed to decode base64 item image: {e}")
+
     item = Item(
         name=data["name"],
         category=data.get("category", "Top"),
         color=data.get("color", ""),
         brand=data.get("brand", ""),
         cost=data.get("cost"),
-        image_path=data.get("image", ""),
+        image_path=image_val,
         user_id=user.id,
     )
     db.session.add(item)
@@ -299,7 +321,36 @@ def scan_outfit():
         "image_path": filepath
     }), 201
 
+@app.route("/api/detect", methods=["POST", "OPTIONS"])
+def detect():
+    if request.method == "OPTIONS":
+        return "", 204
 
+    user, err = require_auth()
+    if err:
+        return err
+
+    data = request.get_json()
+    if not data or "image" not in data:
+        return jsonify({"error": "No image provided"}), 400
+
+    if len(data["image"]) > 13_000_000:
+        return jsonify({"error": "Image too large (max 10 MB)"}), 413
+
+    try:
+        image_b64 = data["image"]
+        if "," in image_b64:
+            image_b64 = image_b64.split(",", 1)[1]
+        image_bytes = base64.b64decode(image_b64)
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        image_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if image_bgr is None:
+            return jsonify({"error": "Could not decode image"}), 400
+        image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
+        detections = detect_clothing(image_rgb)
+        return jsonify({"detections": detections})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, port=5001)

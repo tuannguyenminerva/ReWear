@@ -2,11 +2,11 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Camera, Check, Plus, Loader2, Upload, Calendar, Edit2, X, Search } from 'lucide-react';
 import { useWardrobe } from '../WardrobeContext';
 import { ClothingItem } from '../types';
-
-const DETECT_API = "http://localhost:5001/api/detect";
+import heic2any from 'heic2any';
+import { detectionApi } from '../api';
 
 export const CameraView: React.FC = () => {
-  const { wardrobe, addOutfit } = useWardrobe();
+  const { wardrobe, addOutfit, addItem } = useWardrobe();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -24,7 +24,7 @@ export const CameraView: React.FC = () => {
 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
-  const [editName, setEditName] = useState('');
+  const [editForm, setEditForm] = useState({ name: '', category: 'Top' as any, color: '' });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [logError, setLogError] = useState('');
@@ -58,49 +58,97 @@ export const CameraView: React.FC = () => {
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    // Mirror to match the CSS mirror effect
     ctx.translate(canvas.width, 0);
     ctx.scale(-1, 1);
     ctx.drawImage(video, 0, 0);
+    // Store preview
     canvas.toBlob(blob => {
       if (!blob) return;
       const file = new File([blob], `capture_${Date.now()}.jpg`, { type: 'image/jpeg' });
-      const url = URL.createObjectURL(blob);
       setUploadedFile(file);
-      setUploadedImage(url);
-      // Simulate detection on captured frame
-      triggerDetection();
+      setUploadedImage(URL.createObjectURL(blob));
     }, 'image/jpeg', 0.85);
+    // Send to real detection API
+    runDetection(canvas.toDataURL('image/jpeg', 0.85));
   }, []);
 
-  // ── Detection simulation ────────────────────────────────────────────────────
-  const triggerDetection = useCallback(() => {
-    setIsDetecting(true);
-    setTimeout(() => {
-      const count = Math.floor(Math.random() * 3) + 2;
-      const shuffled = [...wardrobe].sort(() => 0.5 - Math.random());
-      setDetectedItems(shuffled.slice(0, count));
-      setIsDetecting(false);
-    }, 1500);
-  }, [wardrobe]);
+  // ── Detection ────────────────────────────────────────────────────
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [noDetectionMsg, setNoDetectionMsg] = useState(false);
 
-  // Auto-detect every 4 s while live camera is running (no uploaded image)
-  useEffect(() => {
-    if (permissionError || uploadedImage || isLogSuccess) return;
-    const interval = setInterval(() => {
-      if (editingItemId) return;
-      triggerDetection();
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [permissionError, uploadedImage, isLogSuccess, editingItemId, triggerDetection]);
+  const runDetection = async (imageB64: string) => {
+    setIsDetecting(true);
+    setApiError(null);
+    setNoDetectionMsg(false);
+    try {
+      const data = await detectionApi.detect(imageB64);
+      if (data.detections?.length > 0) {
+        setDetectedItems(data.detections as ClothingItem[]);
+      } else {
+        setNoDetectionMsg(true);
+        setTimeout(() => setNoDetectionMsg(false), 3000);
+      }
+    } catch (err: any) {
+      setApiError(err.message || "Failed to connect to detection server");
+    } finally {
+      setIsDetecting(false);
+    }
+  };
+
+  // Removed auto-detect loop, detection now only occurs explicitly via Capture or Upload.
 
   // ── File upload ─────────────────────────────────────────────────────────────
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.[0]) return;
-    const file = e.target.files[0];
+    let file = e.target.files[0];
+    
+    // HEIC support: Chrome cannot load HEIC in an Image tag, so convert to JPEG blob first!
+    if (file.name.toLowerCase().endsWith('.heic') || file.type === 'image/heic') {
+      try {
+        setIsDetecting(true);
+        const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.8 });
+        const blob = Array.isArray(converted) ? converted[0] : converted;
+        file = new File([blob], file.name.replace(/\.heic$/i, '.jpg'), { type: "image/jpeg" });
+      } catch (err) {
+        console.error("HEIC conversion error:", err);
+        setApiError("Could not convert HEIC format. Please try another image.");
+        setIsDetecting(false);
+        return;
+      }
+    }
+
     setUploadedFile(file);
-    setUploadedImage(URL.createObjectURL(file));
-    triggerDetection();
+    
+    // Instead of raw readAsDataURL which causes backend Payload/cv2-decoding 400s
+    // onto giant or exotic formats, paint onto a localized Canvas converting it
+    // efficiently to a standardized Web-safe JPEG.
+    const url = URL.createObjectURL(file);
+    setUploadedImage(url);
+    
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let { width, height } = img;
+      
+      // constrain massive multi-megabyte photos saving API payload overhead
+      const MAX_DIM = 1080;
+      if (width > MAX_DIM || height > MAX_DIM) {
+        const ratio = Math.min(MAX_DIM / width, MAX_DIM / height);
+        width *= ratio;
+        height *= ratio;
+      }
+      canvas.width = width;
+      canvas.height = height;
+      
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = 'white'; // fill transparent backgrounds
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        runDetection(canvas.toDataURL('image/jpeg', 0.85));
+      }
+    };
+    img.src = url;
   };
 
   // ── Log outfit ──────────────────────────────────────────────────────────────
@@ -109,13 +157,19 @@ export const CameraView: React.FC = () => {
     setIsLogging(true);
     setLogError('');
     try {
-      await addOutfit(detectedItems, selectedDate, uploadedFile);
+      const realItems = await Promise.all(
+        detectedItems.map(async (item) => {
+          if (item.id.startsWith('det-')) {
+            return await addItem(item);
+          }
+          return item;
+        })
+      );
+
+      await addOutfit(realItems, selectedDate, uploadedFile);
       setIsLogSuccess(true);
       setTimeout(() => {
-        setDetectedItems([]);
-        setUploadedImage(null);
-        setUploadedFile(null);
-        setIsLogSuccess(false);
+        handleRetry();
       }, 3000);
     } catch (err: unknown) {
       setLogError(err instanceof Error ? err.message : 'Failed to log outfit');
@@ -124,11 +178,40 @@ export const CameraView: React.FC = () => {
     }
   };
 
-  // ── Item editing ────────────────────────────────────────────────────────────
-  const startEditing = (item: ClothingItem) => { setEditingItemId(item.id); setEditName(item.name); };
-  const saveEditing = (id: string) => {
-    setDetectedItems(prev => prev.map(item => item.id === id ? { ...item, name: editName } : item));
+  const handleRetry = () => {
+    setDetectedItems([]);
+    setUploadedImage(null);
+    setUploadedFile(null);
+    setApiError(null);
+    setLogError('');
+    setIsLogSuccess(false);
     setEditingItemId(null);
+  };
+
+  // ── Item editing ────────────────────────────────────────────────────────────
+  const startEditing = (item: ClothingItem) => {
+    setEditingItemId(item.id);
+    setEditForm({ name: item.name, category: item.category, color: item.color });
+  };
+  const saveEditing = (id: string) => {
+    setDetectedItems(prev => prev.map(item => item.id === id ? { ...item, ...editForm } : item));
+    setEditingItemId(null);
+  };
+  const createBlankItem = () => {
+    const newItem: ClothingItem = {
+      id: `det-manual-${Date.now()}`,
+      name: 'New Item',
+      category: 'Top',
+      color: '',
+      image: '',
+      brand: '',
+      addedDate: new Date().toISOString().split('T')[0],
+      wearCount: 0,
+      lastWorn: 'Never'
+    };
+    setDetectedItems(prev => [...prev, newItem]);
+    startEditing(newItem);
+    setIsModalOpen(false);
   };
   const removeItem = (id: string) => setDetectedItems(prev => prev.filter(item => item.id !== id));
   const addItemManually = (item: ClothingItem) => {
@@ -165,26 +248,35 @@ export const CameraView: React.FC = () => {
           </div>
         ) : (
           <>
-            {uploadedImage ? (
-              <div className="absolute inset-0 w-full h-full bg-stone-900 flex items-center justify-center">
+            {uploadedImage && (
+              <div className="absolute inset-0 w-full h-full bg-stone-900 flex items-center justify-center z-20">
                 <img src={uploadedImage} alt="Uploaded look" className="w-full h-full object-contain" />
                 <button
-                  onClick={() => { setUploadedImage(null); setUploadedFile(null); }}
+                  onClick={handleRetry}
                   className="absolute top-8 right-8 p-3 bg-black/50 backdrop-blur-md text-white rounded-full hover:bg-black/70 transition-all z-30"
                   title="Return to camera"
                 >
                   <Camera size={20} />
                 </button>
               </div>
-            ) : (
-              <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover opacity-90 scale-x-[-1]" />
             )}
+            <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover opacity-90 scale-x-[-1]" />
 
             {/* Scanning Overlay */}
             <div className={`absolute inset-0 pointer-events-none transition-opacity duration-1000 ${isDetecting ? 'opacity-100' : 'opacity-0'}`}>
               <div className="absolute inset-0 border-[1px] border-white/20 m-8 rounded-3xl" />
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 border border-white/30 rounded-full animate-pulse" />
             </div>
+            {apiError && (
+              <div className="absolute top-6 left-1/2 -translate-x-1/2 z-30 bg-red-500/90 text-white text-xs font-bold px-4 py-2 rounded-full backdrop-blur-sm">
+                {apiError}
+              </div>
+            )}
+            {noDetectionMsg && !apiError && (
+              <div className="absolute top-6 left-1/2 -translate-x-1/2 z-30 bg-black/60 text-white/80 text-xs px-4 py-2 rounded-full backdrop-blur-sm">
+                No clothing detected — try moving closer or adjusting lighting
+              </div>
+            )}
 
             {/* Bounding Box Labels */}
             {!isLogSuccess && detectedItems.map((item, idx) => {
@@ -289,37 +381,49 @@ export const CameraView: React.FC = () => {
                       </div>
                       <div className="flex-1 min-w-0 pt-1">
                         {editingItemId === item.id ? (
-                          <div className="flex items-center gap-2">
-                            <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)}
-                              className="w-full font-serif italic text-lg border-b border-primary-300 bg-transparent focus:outline-none focus:border-primary-500"
-                              autoFocus />
-                            <button onClick={() => saveEditing(item.id)} className="text-stone-800 hover:text-primary-600"><Check size={16} /></button>
+                          <div className="flex flex-col gap-2">
+                            <input type="text" value={editForm.name} onChange={(e) => setEditForm({...editForm, name: e.target.value})}
+                              className="w-full font-serif italic text-lg border-b border-primary-300 bg-transparent focus:outline-none focus:border-primary-500" autoFocus placeholder="Item Name"/>
+                            <div className="flex gap-2">
+                              <select value={editForm.category} onChange={(e) => setEditForm({...editForm, category: e.target.value as any})}
+                                className="w-1/2 text-[10px] font-bold uppercase tracking-widest border-b border-primary-300 bg-transparent focus:outline-none focus:border-primary-500 pb-1 cursor-pointer">
+                                {['Top', 'Bottom', 'Shoes', 'Outerwear', 'Accessory'].map(c => <option key={c} value={c}>{c}</option>)}
+                              </select>
+                              <input type="text" value={editForm.color} onChange={(e) => setEditForm({...editForm, color: e.target.value})}
+                                className="w-1/2 text-[10px] font-bold uppercase tracking-widest border-b border-primary-300 bg-transparent focus:outline-none focus:border-primary-500 pb-1" placeholder="Color"/>
+                            </div>
+                            <button onClick={() => saveEditing(item.id)} className="text-primary-600 font-bold uppercase text-[10px] mt-2 text-left self-start flex items-center gap-1 hover:text-primary-800"><Check size={14} /> Save Details</button>
                           </div>
                         ) : (
                           <>
-                            <h4 className="font-serif text-xl text-stone-900 italic cursor-pointer hover:text-primary-600 transition-colors"
-                              onClick={() => startEditing(item)}>
-                              {item.name}
-                            </h4>
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-serif text-xl text-stone-900 italic cursor-pointer hover:text-primary-600 transition-colors"
+                                onClick={() => startEditing(item)}>
+                                {item.name}
+                              </h4>
+                              <button onClick={() => startEditing(item)} className="text-stone-400 hover:text-primary-600 transition-colors p-1" title="Edit Details">
+                                <Edit2 size={14} />
+                              </button>
+                            </div>
                             <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mt-1">{item.category}</p>
                           </>
                         )}
                       </div>
-                      {!editingItemId && (
-                        <button onClick={() => startEditing(item)}
-                          className="text-stone-300 hover:text-stone-800 transition-colors opacity-0 group-hover:opacity-100">
-                          <Edit2 size={14} />
-                        </button>
-                      )}
                     </div>
                   </div>
                 ))}
               </div>
 
-              <button onClick={() => setIsModalOpen(true)}
-                className="w-full py-4 border border-primary-200 text-primary-600 text-xs font-bold uppercase tracking-widest hover:border-primary-600 hover:bg-primary-50 transition-all mt-8">
-                + Add Item Manually
-              </button>
+              <div className="flex gap-2 mt-8">
+                <button onClick={() => setIsModalOpen(true)}
+                  className="flex-1 py-4 border border-primary-200 text-primary-600 text-[10px] font-bold uppercase tracking-widest hover:border-primary-600 hover:bg-primary-50 transition-all">
+                  Browse Wardrobe
+                </button>
+                <button onClick={createBlankItem}
+                  className="flex-1 py-4 bg-stone-100 border border-transparent text-stone-600 text-[10px] font-bold uppercase tracking-widest hover:border-stone-300 transition-all">
+                  + New Item
+                </button>
+              </div>
             </>
           )}
         </div>
@@ -329,21 +433,32 @@ export const CameraView: React.FC = () => {
           {logError && (
             <p className="text-red-500 text-xs mb-3 text-center">{logError}</p>
           )}
-          <button
-            disabled={detectedItems.length === 0 || isLogSuccess || isLogging}
-            onClick={handleLogOutfit}
-            className={`
-              w-full py-4 text-sm font-bold uppercase tracking-[0.15em] transition-all duration-500 flex items-center justify-center gap-2
-              ${detectedItems.length > 0 && !isLogSuccess && !isLogging
-                ? 'bg-primary-500 text-white hover:bg-primary-600 shadow-lg shadow-primary-500/20'
-                : 'bg-stone-100 text-stone-300 cursor-not-allowed'}
-            `}
-          >
-            {isLogging
-              ? <><Loader2 size={16} className="animate-spin" /> Saving…</>
-              : isLogSuccess ? 'Saved to Journal' : 'Log Entry'
-            }
-          </button>
+          <div className="flex gap-3">
+            {(uploadedImage || detectedItems.length > 0) && !isLogSuccess && (
+              <button
+                disabled={isLogging}
+                onClick={handleRetry}
+                className="px-6 py-4 text-xs font-bold uppercase tracking-widest bg-stone-200 text-stone-600 hover:bg-stone-300 transition-all flex items-center justify-center"
+              >
+                Retry
+              </button>
+            )}
+            <button
+              disabled={detectedItems.length === 0 || isLogSuccess || isLogging}
+              onClick={handleLogOutfit}
+              className={`
+                flex-1 py-4 text-sm font-bold uppercase tracking-[0.15em] transition-all duration-500 flex items-center justify-center gap-2
+                ${detectedItems.length > 0 && !isLogSuccess && !isLogging
+                  ? 'bg-primary-500 text-white hover:bg-primary-600 shadow-lg shadow-primary-500/20'
+                  : 'bg-stone-100 text-stone-300 cursor-not-allowed'}
+              `}
+            >
+              {isLogging
+                ? <><Loader2 size={16} className="animate-spin" /> Saving…</>
+                : isLogSuccess ? 'Saved to Journal' : 'Log Entry'
+              }
+            </button>
+          </div>
         </div>
       </div>
 

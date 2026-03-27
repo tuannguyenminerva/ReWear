@@ -30,7 +30,7 @@ interface WardrobeContextType {
   loading: boolean;
   addOutfit: (items: ClothingItem[], date: string, image?: File | null) => Promise<void>;
   updateItem: (item: ClothingItem) => Promise<void>;
-  addItem: (item: ClothingItem) => Promise<void>;
+  addItem: (item: ClothingItem) => Promise<ClothingItem>;
   postponeItem: (itemId: string, date: string) => void;
 }
 
@@ -85,7 +85,7 @@ export const WardrobeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setWardrobe(prev => prev.map(item => item.id === updatedItem.id ? apiItemToClothing(apiItem) : item));
   }, []);
 
-  const addItem = useCallback(async (newItem: ClothingItem) => {
+  const addItem = useCallback(async (newItem: ClothingItem): Promise<ClothingItem> => {
     const apiItem = await itemsApi.create({
       name: newItem.name,
       category: newItem.category,
@@ -94,7 +94,9 @@ export const WardrobeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       cost: newItem.cost,
       image: newItem.image,
     });
-    setWardrobe(prev => [apiItemToClothing(apiItem), ...prev]);
+    const clothingItem = apiItemToClothing(apiItem);
+    setWardrobe(prev => [clothingItem, ...prev]);
+    return clothingItem;
   }, []);
 
   // Postpone is kept local — no backend endpoint needed for MVP
