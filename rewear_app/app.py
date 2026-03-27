@@ -321,7 +321,7 @@ def scan_outfit():
         "image_path": filepath
     }), 201
 
-@app.route("/api/detect", methods=["POST", "OPTIONS"])
+@app.route("/detect", methods=["POST", "OPTIONS"])
 def detect():
     if request.method == "OPTIONS":
         return "", 204
