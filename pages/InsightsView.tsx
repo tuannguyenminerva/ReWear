@@ -331,8 +331,14 @@ export const InsightsView: React.FC = () => {
 
       {/* Outfit Detail Modal */}
       {selectedOutfit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-sm animate-in fade-in duration-300"
+          onClick={() => setSelectedOutfit(null)}
+        >
+          <div
+            className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="p-8 border-b border-stone-100 flex items-center justify-between">
               <div>
                 <h3 className="text-2xl font-serif italic text-stone-900">Outfit Details</h3>
@@ -346,7 +352,7 @@ export const InsightsView: React.FC = () => {
               </button>
             </div>
             
-            <div className="p-8">
+            <div className="p-8 overflow-y-auto">
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
                 {selectedOutfit.items.map(itemId => {
                   const item = wardrobe.find(w => w.id === itemId);
@@ -383,9 +389,15 @@ export const InsightsView: React.FC = () => {
 
       {/* Item Detail Modal */}
       {selectedItemInfo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-            <div className="p-8 border-b border-stone-100 flex items-center justify-between">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-sm animate-in fade-in duration-300"
+          onClick={() => setSelectedItemInfo(null)}
+        >
+          <div
+            className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-8 border-b border-stone-100 flex items-center justify-between flex-shrink-0">
               <div>
                 <h3 className="text-2xl font-serif italic text-stone-900">{selectedItemInfo.name}</h3>
                 <p className="text-xs font-bold tracking-widest uppercase text-stone-400 mt-1">{selectedItemInfo.category}</p>
@@ -398,8 +410,8 @@ export const InsightsView: React.FC = () => {
               </button>
             </div>
             
-            <div className="p-8">
-              <div className="w-full aspect-[4/5] sm:aspect-[3/4] bg-stone-100 rounded-xl overflow-hidden mb-6">
+            <div className="p-8 overflow-y-auto">
+              <div className="w-full aspect-square bg-stone-100 rounded-xl overflow-hidden mb-6">
                 <img src={selectedItemInfo.image || '/placeholder-garment.svg'} className="w-full h-full object-cover" alt={selectedItemInfo.name} />
               </div>
 

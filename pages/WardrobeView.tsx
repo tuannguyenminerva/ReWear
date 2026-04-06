@@ -7,7 +7,8 @@ export const WardrobeView: React.FC = () => {
   const { wardrobe, updateItem, addItem } = useWardrobe();
   const [selectedCategory, setSelectedCategory] = useState<Category | 'All'>('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedItem, setSelectedItem] = useState<ClothingItem | null>(null);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const selectedItem = selectedItemId ? (wardrobe.find(i => i.id === selectedItemId) ?? null) : null;
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const { removeItem, addOutfit } = useWardrobe();
@@ -61,9 +62,8 @@ export const WardrobeView: React.FC = () => {
     if (selectedItem) {
       const updatedItem = { ...selectedItem, name: editForm.name, category: editForm.category };
       
-      // Update context state
+      // Update context state — the modal will auto-reflect changes via the live wardrobe lookup
       updateItem(updatedItem);
-      setSelectedItem(updatedItem);
       setIsEditing(false);
     }
   };
@@ -144,7 +144,7 @@ export const WardrobeView: React.FC = () => {
       {filteredItems.length > 0 ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-8 gap-y-12">
           {filteredItems.map(item => (
-            <div key={item.id} onClick={() => { setSelectedItem(item); setIsEditing(false); }} className="group cursor-pointer">
+            <div key={item.id} onClick={() => { setSelectedItemId(item.id); setIsEditing(false); }} className="group cursor-pointer">
               <div className="aspect-[3/4] overflow-hidden bg-stone-100 mb-4 relative">
                  <img src={item.image || '/placeholder-garment.svg'} alt={item.name} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700 ease-out" />
                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-500" />
@@ -282,7 +282,7 @@ export const WardrobeView: React.FC = () => {
       )}
 
       {/* Item Detail Modal */}
-      {selectedItem && (
+      {selectedItem && selectedItemId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-100/80 backdrop-blur-md animate-in fade-in duration-300">
           <div className="bg-[#fafaf9] w-full max-w-5xl h-[80vh] overflow-hidden flex flex-col md:flex-row shadow-2xl animate-in zoom-in-95 duration-300 border border-stone-200">
             
@@ -290,7 +290,7 @@ export const WardrobeView: React.FC = () => {
             <div className="w-full md:w-1/2 h-64 md:h-auto relative bg-stone-200">
               <img src={selectedItem.image || '/placeholder-garment.svg'} alt={selectedItem.name} className="w-full h-full object-cover" />
               <button 
-                onClick={() => setSelectedItem(null)} 
+                onClick={() => setSelectedItemId(null)} 
                 className="absolute top-6 left-6 text-white mix-blend-difference md:hidden"
               >
                 <X size={24} />
@@ -329,7 +329,7 @@ export const WardrobeView: React.FC = () => {
                   )}
                 </div>
                 <button 
-                  onClick={() => setSelectedItem(null)} 
+                  onClick={() => setSelectedItemId(null)} 
                   className="hidden md:block text-stone-400 hover:text-stone-900 transition-colors ml-8"
                 >
                   <X size={32} strokeWidth={1} />
@@ -363,7 +363,7 @@ export const WardrobeView: React.FC = () => {
                 <h3 className="text-lg font-serif italic text-stone-900 mb-6">Pairs well with</h3>
                 <div className="grid grid-cols-3 gap-4">
                   {recommendedItems.map(rec => (
-                    <div key={rec.id} className="group cursor-pointer" onClick={() => setSelectedItem(rec)}>
+                    <div key={rec.id} className="group cursor-pointer" onClick={() => setSelectedItemId(rec.id)}>
                        <div className="aspect-[3/4] overflow-hidden bg-stone-100 mb-2">
                          <img src={rec.image || '/placeholder-garment.svg'} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" alt={rec.name} />
                        </div>
