@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { User, LogOut } from 'lucide-react';
-import { useAuth } from '../AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 
 export const Navbar: React.FC = () => {
   const { user, logout } = useAuth();

@@ -1,23 +1,16 @@
-import base64
 import logging
 import os
-import uuid
-from flask import Flask, request, jsonify, session, render_template
+
+from flask import Flask
 from flask_cors import CORS
-from models import db, User, Item, Outfit, OutfitItem
-from sqlalchemy.orm import joinedload
-from datetime import date
-from detector import detect_clothing
-import cv2
-import numpy as np
+from models import db
+from routes import auth_bp, items_bp, outfits_bp, detection_bp
 
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-# SECRET_KEY must be set via the SECRET_KEY environment variable in production.
-# For local development a fallback is used, but a warning is logged.
 _secret_key = os.environ.get('SECRET_KEY')
 if not _secret_key:
     _secret_key = 'dev-secret-key-change-in-production'
@@ -29,8 +22,6 @@ app.config['SECRET_KEY'] = _secret_key
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Cookie security: in production (PRODUCTION=true) use SameSite=None + Secure=True
-# behind an HTTPS reverse proxy.  In local HTTP dev use Lax + Secure=False.
 _production = os.environ.get('PRODUCTION', '').lower() in ('1', 'true', 'yes')
 app.config['SESSION_COOKIE_SAMESITE'] = 'None' if _production else 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = _production
@@ -40,370 +31,24 @@ UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+# ── Extensions ────────────────────────────────────────────────────────────────
 db.init_app(app)
 CORS(app, supports_credentials=True, origins=["http://localhost:3000"])
 
 with app.app_context():
     db.create_all()
 
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
-def require_auth():
-    """Return (user, None) or (None, error_response)."""
-    user_id = session.get("user_id")
-    if not user_id:
-        return None, (jsonify({"error": "Not authenticated"}), 401)
-    user = db.session.get(User, user_id)
-    if not user:
-        session.pop("user_id", None)
-        return None, (jsonify({"error": "Not authenticated"}), 401)
-    return user, None
+# ── Blueprints ────────────────────────────────────────────────────────────────
+app.register_blueprint(auth_bp)
+app.register_blueprint(items_bp)
+app.register_blueprint(outfits_bp)
+app.register_blueprint(detection_bp)
 
 
-def item_to_dict(item):
-    """Serialize an Item with computed wear stats.
-
-    Expects item.outfit_items to be already loaded (via joinedload) so that
-    each outfit_item.outfit is also available without triggering extra queries.
-    """
-    wear_count = len(item.outfit_items)
-    last_worn = None
-    if item.outfit_items:
-        # outfit is available via the backref loaded by joinedload
-        dates = [
-            oi.outfit.worn_date
-            for oi in item.outfit_items
-            if oi.outfit is not None
-        ]
-        last_worn = max(dates).isoformat() if dates else None
-    return {
-        "id": str(item.id),
-        "name": item.name,
-        "category": item.category or "Top",
-        "image": item.image_path or "",
-        "wearCount": wear_count,
-        "lastWorn": last_worn or item.created_at.date().isoformat(),
-        "color": item.color or item.ai_color_primary or "",
-        "brand": item.brand or "",
-        "addedDate": item.created_at.date().isoformat(),
-        "postponedUntil": item.postponed_until.isoformat() if item.postponed_until else None,
-        "cost": item.cost,
-    }
-
-
-def outfit_to_dict(outfit):
-    return {
-        "id": str(outfit.id),
-        "date": outfit.worn_date.isoformat(),
-        "items": [str(oi.item_id) for oi in outfit.outfit_items],
-        "imagePath": outfit.image_path,
-    }
-
-
-# ── Home ──────────────────────────────────────────────────────────────────────
 @app.route("/")
 def home():
     return "ReWear backend is running!"
 
-
-# ── Auth ──────────────────────────────────────────────────────────────────────
-@app.route("/auth/register", methods=["POST"])
-def register():
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "Invalid JSON"}), 400
-
-    email = data.get("email")
-    password = data.get("password")
-    username = data.get("username") or data.get("name") or email
-
-    if not email or not password:
-        return jsonify({"error": "Email and password required"}), 400
-
-    if User.query.filter_by(email=email).first():
-        return jsonify({"error": "User already exists"}), 409
-
-    user = User(email=email, username=username)
-    user.set_password(password)
-    db.session.add(user)
-    db.session.commit()
-
-    session["user_id"] = user.id
-    return jsonify({"message": "User registered", "user": {"id": user.id, "email": user.email, "username": user.username}}), 201
-
-
-@app.route("/auth/login", methods=["POST"])
-def login():
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "Invalid JSON"}), 400
-
-    email = data.get("email")
-    password = data.get("password")
-
-    user = User.query.filter_by(email=email).first()
-    if not user or not user.check_password(password):
-        return jsonify({"error": "Invalid credentials"}), 401
-
-    session["user_id"] = user.id
-    return jsonify({"message": "Logged in", "user": {"id": user.id, "email": user.email, "username": user.username}})
-
-
-@app.route("/auth/logout", methods=["POST"])
-def logout():
-    session.pop("user_id", None)
-    return jsonify({"message": "Logged out"})
-
-
-@app.route("/auth/me", methods=["GET"])
-def me():
-    user, err = require_auth()
-    if err:
-        return err
-    return jsonify({"id": user.id, "email": user.email, "username": user.username})
-
-
-# ── Items (Wardrobe) ──────────────────────────────────────────────────────────
-@app.route("/items", methods=["GET"])
-def get_items():
-    user, err = require_auth()
-    if err:
-        return err
-    # Use joinedload to fetch outfit_items and their parent outfits in a single
-    # SQL query, eliminating the N+1 pattern in item_to_dict.
-    items = (
-        Item.query
-        .filter_by(user_id=user.id, archived_at=None)
-        .options(
-            joinedload(Item.outfit_items).joinedload(OutfitItem.outfit)
-        )
-        .all()
-    )
-    return jsonify([item_to_dict(i) for i in items])
-
-
-@app.route("/items", methods=["POST"])
-def create_item():
-    user, err = require_auth()
-    if err:
-        return err
-    data = request.get_json()
-    if not data or not data.get("name"):
-        return jsonify({"error": "name is required"}), 400
-
-    image_val = data.get("image", "")
-    if image_val and image_val.startswith("data:image/"):
-        try:
-            mime_part, b64_part = image_val.split(",", 1)
-            ext = ".jpg"
-            if "png" in mime_part:
-                ext = ".png"
-            image_bytes = base64.b64decode(b64_part)
-            filename = f"crop_{uuid.uuid4().hex}{ext}"
-            save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-            with open(save_path, "wb") as f:
-                f.write(image_bytes)
-            image_val = f"/uploads/{filename}"
-        except Exception as e:
-            logger.error("Failed to decode base64 item image: %s", e)
-            return jsonify({"error": "invalid image data"}), 400
-
-    item = Item(
-        name=data["name"],
-        category=data.get("category", "Top"),
-        color=data.get("color", ""),
-        brand=data.get("brand", ""),
-        cost=data.get("cost"),
-        image_path=image_val,
-        user_id=user.id,
-    )
-    db.session.add(item)
-    db.session.commit()
-    return jsonify(item_to_dict(item)), 201
-
-
-@app.route("/items/<int:item_id>", methods=["PUT"])
-def update_item(item_id):
-    user, err = require_auth()
-    if err:
-        return err
-    item = Item.query.filter_by(id=item_id, user_id=user.id).first()
-    if not item:
-        return jsonify({"error": "Not found"}), 404
-
-    data = request.get_json() or {}
-    for field in ("name", "category", "color", "brand", "cost", "image_path"):
-        if field in data:
-            setattr(item, field, data[field])
-            
-    if "postponedUntil" in data:
-        if data["postponedUntil"]:
-            from datetime import date
-            try:
-                item.postponed_until = date.fromisoformat(data["postponedUntil"])
-            except ValueError:
-                pass
-        else:
-            item.postponed_until = None
-
-    # allow frontend to send 'image' key too
-    if "image" in data:
-        item.image_path = data["image"]
-    db.session.commit()
-    return jsonify(item_to_dict(item))
-
-
-@app.route("/items/<int:item_id>", methods=["DELETE"])
-def delete_item(item_id):
-    user, err = require_auth()
-    if err:
-        return err
-    item = Item.query.filter_by(id=item_id, user_id=user.id).first()
-    if not item:
-        return jsonify({"error": "Not found"}), 404
-    from datetime import datetime
-    item.archived_at = datetime.utcnow()
-    db.session.commit()
-    return jsonify({"message": "Archived"})
-
-
-# ── Outfits ───────────────────────────────────────────────────────────────────
-@app.route("/outfits", methods=["GET"])
-def get_outfits():
-    user, err = require_auth()
-    if err:
-        return err
-    outfits = Outfit.query.filter_by(user_id=user.id).order_by(Outfit.worn_date.desc()).all()
-    return jsonify([outfit_to_dict(o) for o in outfits])
-
-
-@app.route("/outfits", methods=["POST"])
-def create_outfit():
-    user, err = require_auth()
-    if err:
-        return err
-
-    # Support multipart (with image) or JSON
-    if request.content_type and "multipart" in request.content_type:
-        worn_date_str = request.form.get("date")
-        item_ids = request.form.getlist("item_ids")
-        notes = request.form.get("notes", "")
-        image_path = None
-        if "image" in request.files:
-            f = request.files["image"]
-            ext = os.path.splitext(f.filename)[1] if f.filename else '.jpg'
-            filename = f"{uuid.uuid4().hex}{ext}"
-            save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-            f.save(save_path)
-            image_path = f"/uploads/{filename}"
-    else:
-        data = request.get_json() or {}
-        worn_date_str = data.get("date")
-        item_ids = data.get("item_ids", [])
-        notes = data.get("notes", "")
-        image_path = data.get("image_path")
-
-    try:
-        worn_date = date.fromisoformat(worn_date_str) if worn_date_str else date.today()
-    except ValueError:
-        worn_date = date.today()
-
-    outfit = Outfit(worn_date=worn_date, notes=notes, image_path=image_path, user_id=user.id)
-    db.session.add(outfit)
-    db.session.flush()  # get outfit.id
-
-    for iid in item_ids:
-        item = Item.query.filter_by(id=int(iid), user_id=user.id).first()
-        if item:
-            db.session.add(OutfitItem(outfit_id=outfit.id, item_id=item.id, user_action="user_added"))
-
-    db.session.commit()
-    return jsonify(outfit_to_dict(outfit)), 201
-
-
-# ── Static uploads ────────────────────────────────────────────────────────────
-# Use <string:filename> (no slashes) instead of <path:filename> to prevent
-# directory traversal attacks such as ../../etc/passwd.
-@app.route("/uploads/<string:filename>")
-def uploaded_file(filename):
-    from flask import send_from_directory
-    return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
-
-
-@app.route("/scan")
-def scan():
-    return render_template("scan.html")
-
-@app.route("/outfit/scan", methods=["POST"])
-def scan_outfit():
-    user_id = session.get("user_id")
-    if not user_id:
-        return jsonify({"error": "Not authenticated"}), 401
-
-    data = request.get_json()
-    if not data or "image" not in data:
-        return jsonify({"error": "No image provided"}), 400
-
-    # Decode base64 image from frontend
-    image_data = data["image"].split(",")[1]
-    image_bytes = base64.b64decode(image_data)
-
-    # Save to disk
-    os.makedirs("uploads", exist_ok=True)
-    filename = f"{uuid.uuid4().hex}.jpg"
-    filepath = os.path.join("uploads", filename)
-
-    with open(filepath, "wb") as f:
-        f.write(image_bytes)
-
-    # Create Outfit record
-    outfit = Outfit(
-        image_path=filepath,
-        user_id=user_id,
-        ai_status="pending"
-    )
-    db.session.add(outfit)
-    db.session.commit()
-
-    return jsonify({
-        "message": "Outfit saved",
-        "outfit_id": outfit.id,
-        "image_path": filepath
-    }), 201
-
-@app.route("/detect", methods=["POST", "OPTIONS"])
-def detect():
-    if request.method == "OPTIONS":
-        return "", 204
-
-    user, err = require_auth()
-    if err:
-        return err
-
-    data = request.get_json()
-    if not data or "image" not in data:
-        return jsonify({"error": "No image provided"}), 400
-
-    if len(data["image"]) > 13_000_000:
-        return jsonify({"error": "Image too large (max 10 MB)"}), 413
-
-    try:
-        image_b64 = data["image"]
-        if "," in image_b64:
-            image_b64 = image_b64.split(",", 1)[1]
-        image_bytes = base64.b64decode(image_b64)
-        nparr = np.frombuffer(image_bytes, np.uint8)
-        image_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        if image_bgr is None:
-            return jsonify({"error": "Could not decode image"}), 400
-        image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
-        detections = detect_clothing(image_rgb)
-        return jsonify({"detections": detections})
-    except Exception as e:
-        # Log the full exception server-side; return a generic message to the
-        # client so internal details are never leaked.
-        logger.exception("Detection failed: %s", e)
-        return jsonify({"error": "Detection failed"}), 500
 
 if __name__ == "__main__":
     app.run(debug=True, port=5001)

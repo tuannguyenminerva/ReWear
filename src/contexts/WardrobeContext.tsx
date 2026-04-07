@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { ClothingItem, Outfit } from './types';
-import { itemsApi, outfitsApi, ApiItem, ApiOutfit } from './api';
+import { ClothingItem, Outfit } from '../types';
+import { itemsApi, ApiItem } from '../api/items';
+import { outfitsApi, ApiOutfit } from '../api/outfits';
 import { useAuth } from './AuthContext';
 
 // ── Adapters ──────────────────────────────────────────────────────────────────

@@ -1,9 +1,10 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Camera, Check, Plus, Loader2, Upload, Calendar, Edit2, X, Search } from 'lucide-react';
-import { useWardrobe } from '../WardrobeContext';
+import { Camera, Check, Loader2, Upload, Edit2, X } from 'lucide-react';
+import { useWardrobe } from '../contexts/WardrobeContext';
 import { Category, ClothingItem } from '../types';
 import heic2any from 'heic2any';
-import { detectionApi } from '../api';
+import { detectionApi } from '../api/detection';
+import { WardrobePickerModal } from '../components/WardrobePickerModal';
 
 export const CameraView: React.FC = () => {
   const { wardrobe, addOutfit, addItem } = useWardrobe();
@@ -18,7 +19,6 @@ export const CameraView: React.FC = () => {
   const [isLogSuccess, setIsLogSuccess] = useState(false);
   const [permissionError, setPermissionError] = useState(false);
 
-  // We keep both a preview URL and the raw File so we can upload it
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
 
@@ -28,7 +28,6 @@ export const CameraView: React.FC = () => {
     { name: '', category: 'Top', color: '' }
   );
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [logError, setLogError] = useState('');
 
   // ── Camera ──────────────────────────────────────────────────────────────────
@@ -51,16 +50,11 @@ export const CameraView: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Track the current object URL so we can revoke it before creating a new one
-  // (fix: object URL memory leak)
   const objectUrlRef = useRef<string | null>(null);
 
-  // Revoke on unmount
   useEffect(() => {
     return () => {
-      if (objectUrlRef.current) {
-        URL.revokeObjectURL(objectUrlRef.current);
-      }
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
     };
   }, []);
 
@@ -76,19 +70,15 @@ export const CameraView: React.FC = () => {
     ctx.translate(canvas.width, 0);
     ctx.scale(-1, 1);
     ctx.drawImage(video, 0, 0);
-    // Store preview, revoking the previous object URL first
     canvas.toBlob(blob => {
       if (!blob) return;
       const file = new File([blob], `capture_${Date.now()}.jpg`, { type: 'image/jpeg' });
       setUploadedFile(file);
-      if (objectUrlRef.current) {
-        URL.revokeObjectURL(objectUrlRef.current);
-      }
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
       const url = URL.createObjectURL(blob);
       objectUrlRef.current = url;
       setUploadedImage(url);
     }, 'image/jpeg', 0.85);
-    // Send to real detection API
     runDetection(canvas.toDataURL('image/jpeg', 0.85));
   }, []);
 
@@ -105,7 +95,6 @@ export const CameraView: React.FC = () => {
       if (data.detections?.length > 0) {
         setDetectedItems(data.detections as ClothingItem[]);
       } else {
-        // Clear any stale detections from a previous scan
         setDetectedItems([]);
         setNoDetectionMsg(true);
         setTimeout(() => setNoDetectionMsg(false), 3000);
@@ -117,14 +106,11 @@ export const CameraView: React.FC = () => {
     }
   };
 
-  // Removed auto-detect loop, detection now only occurs explicitly via Capture or Upload.
-
   // ── File upload ─────────────────────────────────────────────────────────────
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.[0]) return;
     let file = e.target.files[0];
-    
-    // HEIC support: Chrome cannot load HEIC in an Image tag, so convert to JPEG blob first!
+
     if (file.name.toLowerCase().endsWith('.heic') || file.type === 'image/heic') {
       try {
         setIsDetecting(true);
@@ -141,13 +127,7 @@ export const CameraView: React.FC = () => {
 
     setUploadedFile(file);
 
-    // Instead of raw readAsDataURL which causes backend Payload/cv2-decoding 400s
-    // onto giant or exotic formats, paint onto a localized Canvas converting it
-    // efficiently to a standardized Web-safe JPEG.
-    // Revoke the previous object URL before creating a new one.
-    if (objectUrlRef.current) {
-      URL.revokeObjectURL(objectUrlRef.current);
-    }
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
     const url = URL.createObjectURL(file);
     objectUrlRef.current = url;
     setUploadedImage(url);
@@ -156,8 +136,6 @@ export const CameraView: React.FC = () => {
     img.onload = () => {
       const canvas = document.createElement('canvas');
       let { width, height } = img;
-
-      // constrain massive multi-megabyte photos saving API payload overhead
       const MAX_DIM = 1080;
       if (width > MAX_DIM || height > MAX_DIM) {
         const ratio = Math.min(MAX_DIM / width, MAX_DIM / height);
@@ -166,10 +144,9 @@ export const CameraView: React.FC = () => {
       }
       canvas.width = width;
       canvas.height = height;
-
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        ctx.fillStyle = 'white'; // fill transparent backgrounds
+        ctx.fillStyle = 'white';
         ctx.fillRect(0, 0, width, height);
         ctx.drawImage(img, 0, 0, width, height);
         runDetection(canvas.toDataURL('image/jpeg', 0.85));
@@ -186,18 +163,13 @@ export const CameraView: React.FC = () => {
     try {
       const realItems = await Promise.all(
         detectedItems.map(async (item) => {
-          if (item.id.startsWith('det-')) {
-            return await addItem(item);
-          }
+          if (item.id.startsWith('det-')) return await addItem(item);
           return item;
         })
       );
-
       await addOutfit(realItems, selectedDate, uploadedFile);
       setIsLogSuccess(true);
-      setTimeout(() => {
-        handleRetry();
-      }, 3000);
+      setTimeout(() => handleRetry(), 3000);
     } catch (err: unknown) {
       setLogError(err instanceof Error ? err.message : 'Failed to log outfit');
     } finally {
@@ -244,13 +216,7 @@ export const CameraView: React.FC = () => {
   const addItemManually = (item: ClothingItem) => {
     if (!detectedItems.find(i => i.id === item.id)) setDetectedItems(prev => [...prev, item]);
     setIsModalOpen(false);
-    setSearchQuery('');
   };
-
-  const filteredWardrobe = wardrobe.filter(item =>
-    item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.category.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   return (
     <div className="flex h-[calc(100vh-64px)] w-full overflow-hidden bg-stone-900">
@@ -278,11 +244,7 @@ export const CameraView: React.FC = () => {
             {uploadedImage && (
               <div className="absolute inset-0 w-full h-full bg-stone-900 flex items-center justify-center z-20">
                 <img src={uploadedImage} alt="Uploaded look" className="w-full h-full object-contain" />
-                <button
-                  onClick={handleRetry}
-                  className="absolute top-8 right-8 p-3 bg-black/50 backdrop-blur-md text-white rounded-full hover:bg-black/70 transition-all z-30"
-                  title="Return to camera"
-                >
+                <button onClick={handleRetry} className="absolute top-8 right-8 p-3 bg-black/50 backdrop-blur-md text-white rounded-full hover:bg-black/70 transition-all z-30" title="Return to camera">
                   <Camera size={20} />
                 </button>
               </div>
@@ -307,15 +269,9 @@ export const CameraView: React.FC = () => {
 
             {/* Bounding Box Labels */}
             {!isLogSuccess && detectedItems.map((item) => {
-              // Use the actual bbox coordinates returned by the model so labels
-              // appear at the correct on-screen location. Fall back to a neutral
-              // centre position when coordinates are unavailable.
               const bboxX: number = (item as any).bbox_x ?? 50;
               const bboxY: number = (item as any).bbox_y ?? 50;
               const bboxW: number = (item as any).bbox_w ?? 0;
-              const bboxH: number = (item as any).bbox_h ?? 0;
-              // Position the label at the top-left corner of the bounding box.
-              // bbox values are expected as percentages of the image dimensions.
               const top = bboxY;
               const left = bboxX + bboxW / 2;
               return (
@@ -333,12 +289,11 @@ export const CameraView: React.FC = () => {
               );
             })}
 
-            {/* Hidden canvas for frame capture */}
             <canvas ref={canvasRef} className="hidden" />
           </>
         )}
 
-        {/* Bottom toolbar: upload + capture */}
+        {/* Bottom toolbar */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
           <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileUpload} />
           <button onClick={() => fileInputRef.current?.click()}
@@ -362,12 +317,8 @@ export const CameraView: React.FC = () => {
           <h2 className="text-3xl font-serif italic text-stone-900">Daily Look</h2>
           <div className="flex items-center gap-2 mt-3 border-b border-stone-200 pb-2">
             <span className="text-xs font-bold tracking-widest uppercase text-stone-400">DATE</span>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="bg-transparent text-sm text-stone-600 font-serif focus:outline-none focus:text-primary-600 ml-auto text-right"
-            />
+            <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)}
+              className="bg-transparent text-sm text-stone-600 font-serif focus:outline-none focus:text-primary-600 ml-auto text-right" />
           </div>
         </div>
 
@@ -466,16 +417,11 @@ export const CameraView: React.FC = () => {
 
         {/* Footer */}
         <div className="p-8 bg-[#fafaf9]">
-          {logError && (
-            <p className="text-red-500 text-xs mb-3 text-center">{logError}</p>
-          )}
+          {logError && <p className="text-red-500 text-xs mb-3 text-center">{logError}</p>}
           <div className="flex gap-3">
             {(uploadedImage || detectedItems.length > 0) && !isLogSuccess && (
-              <button
-                disabled={isLogging}
-                onClick={handleRetry}
-                className="px-6 py-4 text-xs font-bold uppercase tracking-widest bg-stone-200 text-stone-600 hover:bg-stone-300 transition-all flex items-center justify-center"
-              >
+              <button disabled={isLogging} onClick={handleRetry}
+                className="px-6 py-4 text-xs font-bold uppercase tracking-widest bg-stone-200 text-stone-600 hover:bg-stone-300 transition-all flex items-center justify-center">
                 Retry
               </button>
             )}
@@ -502,54 +448,13 @@ export const CameraView: React.FC = () => {
         @keyframes scan { 0%{top:0%;opacity:0} 10%{opacity:1} 90%{opacity:1} 100%{top:100%;opacity:0} }
       `}</style>
 
-      {/* Manual Add Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
-          <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
-          <div className="relative w-full max-w-2xl bg-white shadow-2xl overflow-hidden flex flex-col max-h-[80vh] animate-in fade-in zoom-in duration-300">
-            <div className="p-6 border-b border-stone-100 flex items-center justify-between">
-              <div>
-                <h3 className="text-2xl font-serif italic text-stone-900">Select from Wardrobe</h3>
-                <p className="text-[10px] uppercase tracking-widest text-stone-400 mt-1">Manual Selection</p>
-              </div>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 text-stone-400 hover:text-stone-900 transition-colors">
-                <X size={24} />
-              </button>
-            </div>
-            <div className="p-6 bg-stone-50 border-b border-stone-100">
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" size={18} />
-                <input type="text" placeholder="Search by name or category..."
-                  value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 bg-white border border-stone-200 focus:outline-none focus:border-primary-500 font-serif italic"
-                  autoFocus />
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto p-6 no-scrollbar">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
-                {filteredWardrobe.map((item) => (
-                  <div key={item.id} onClick={() => addItemManually(item)} className="group cursor-pointer space-y-3">
-                    <div className="aspect-[3/4] overflow-hidden bg-stone-100 relative">
-                      <img src={item.image} alt={item.name} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" referrerPolicy="no-referrer" />
-                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="bg-white px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-stone-900 shadow-xl">Add to Look</div>
-                      </div>
-                    </div>
-                    <div>
-                      <h4 className="font-serif text-sm italic text-stone-900 group-hover:text-primary-600 transition-colors truncate">{item.name}</h4>
-                      <p className="text-[9px] uppercase tracking-widest text-stone-400 mt-0.5">{item.category}</p>
-                    </div>
-                  </div>
-                ))}
-                {filteredWardrobe.length === 0 && (
-                  <div className="col-span-full py-12 text-center">
-                    <p className="font-serif italic text-stone-400">No items found matching your search.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
+        <WardrobePickerModal
+          wardrobe={wardrobe}
+          onSelect={addItemManually}
+          onCreateBlank={createBlankItem}
+          onClose={() => setIsModalOpen(false)}
+        />
       )}
     </div>
   );

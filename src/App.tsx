@@ -7,8 +7,8 @@ import { InsightsView } from './pages/InsightsView';
 import { InstructionsView } from './pages/InstructionsView';
 import { RegisterView } from './pages/RegisterView';
 import { LoginView } from './pages/LoginView';
-import { WardrobeProvider } from './WardrobeContext';
-import { AuthProvider, useAuth } from './AuthContext';
+import { WardrobeProvider } from './contexts/WardrobeContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 /** Redirect to /login if not authenticated (after initial load). */
 const ProtectedRoute: React.FC<{ element: React.ReactElement }> = ({ element }) => {
