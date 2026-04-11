@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { X, Upload } from 'lucide-react';
 import { ClothingItem, Category } from '../types';
 
 interface CreateItemModalProps {
@@ -18,6 +18,20 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({ onCreateItem, 
     brand: '',
     cost: '',
   });
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      setForm(prev => ({ ...prev, image: dataUrl }));
+      setImagePreview(dataUrl);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleCreate = () => {
     if (!form.name) return;
@@ -103,14 +117,35 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({ onCreateItem, 
               </div>
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-2">Photo URL (Optional)</label>
+              <label className="block text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-2">Photo</label>
               <input
-                type="text"
-                value={form.image}
-                onChange={(e) => setForm({...form, image: e.target.value})}
-                placeholder="https://..."
-                className="w-full bg-transparent border-b border-stone-200 py-2 text-sm focus:outline-none focus:border-primary-500"
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
               />
+              {imagePreview ? (
+                <div className="relative w-full aspect-[3/4] bg-stone-100 rounded-lg overflow-hidden">
+                  <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => { setImagePreview(null); setForm(prev => ({ ...prev, image: '' })); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                    className="absolute top-2 right-2 p-1 bg-white/80 rounded-full text-stone-600 hover:text-red-600"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full py-6 border-2 border-dashed border-stone-200 rounded-lg flex flex-col items-center gap-2 text-stone-400 hover:border-primary-400 hover:text-primary-500 transition-colors"
+                >
+                  <Upload size={20} />
+                  <span className="text-xs font-bold uppercase tracking-widest">Upload Image</span>
+                </button>
+              )}
             </div>
           </div>
           <div className="md:col-span-2">

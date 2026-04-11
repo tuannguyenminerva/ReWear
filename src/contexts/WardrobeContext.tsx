@@ -84,6 +84,7 @@ export const WardrobeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       brand: updatedItem.brand,
       cost: updatedItem.cost,
       image: updatedItem.image,
+      postponedUntil: updatedItem.postponedUntil ?? null,
     });
     setWardrobe(prev => prev.map(item => item.id === updatedItem.id ? apiItemToClothing(apiItem) : item));
   }, []);

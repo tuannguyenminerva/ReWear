@@ -100,76 +100,76 @@ export const InsightsView: React.FC = () => {
   const mostWorn = [...wardrobe].sort((a, b) => b.wearCount - a.wearCount).slice(0, 1)[0];
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
-      <h1 className="text-3xl font-bold text-stone-900 mb-8">Wardrobe Insights</h1>
+    <div className="max-w-7xl mx-auto px-12 py-4">
+      <h1 className="text-2xl font-bold text-stone-900 mb-4">Wardrobe Insights</h1>
 
       {/* Hero Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-        <div className="bg-white p-6 rounded-2xl border border-stone-100 shadow-sm border-l-4 border-l-primary-500">
-          <p className="text-sm font-semibold text-stone-400 uppercase tracking-wider">Total Items</p>
-          <p className="text-4xl font-bold text-stone-900 mt-2">{wardrobe.length}</p>
-          <div className="flex items-center gap-1 mt-2 text-green-600 text-sm font-medium">
-            <ArrowUpRight size={16} /> <span>+{newThisMonth} this month</span>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+        <div className="bg-white p-4 rounded-xl border border-stone-100 shadow-sm border-l-4 border-l-primary-500">
+          <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-wider">Total Items</p>
+          <p className="text-2xl font-bold text-stone-900 mt-1">{wardrobe.length}</p>
+          <div className="flex items-center gap-1 mt-1 text-green-600 text-xs font-medium">
+            <ArrowUpRight size={12} /> <span>+{newThisMonth} this month</span>
           </div>
         </div>
-        <div className="bg-white p-6 rounded-2xl border border-stone-100 shadow-sm">
-          <p className="text-sm font-semibold text-stone-400 uppercase tracking-wider">Log Streak</p>
-          <p className="text-4xl font-bold text-stone-900 mt-2">{streak} Days</p>
-          <div className="flex items-center gap-1 mt-2 text-primary-500 text-sm font-medium">
-            <CalendarClock size={16} /> <span>{streak > 0 ? 'Keep it up!' : 'Start your streak!'}</span>
+        <div className="bg-white p-4 rounded-xl border border-stone-100 shadow-sm">
+          <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-wider">Log Streak</p>
+          <p className="text-2xl font-bold text-stone-900 mt-1">{streak} Days</p>
+          <div className="flex items-center gap-1 mt-1 text-primary-500 text-xs font-medium">
+            <CalendarClock size={12} /> <span>{streak > 0 ? 'Keep it up!' : 'Start your streak!'}</span>
           </div>
         </div>
-        <div className="bg-white p-6 rounded-2xl border border-stone-100 shadow-sm border-l-4 border-l-primary-500">
-          <p className="text-sm font-semibold text-stone-400 uppercase tracking-wider">Utilization</p>
-          <p className="text-4xl font-bold text-stone-900 mt-2">{utilization}%</p>
-          <div className="w-full bg-stone-100 h-2 rounded-full mt-3 overflow-hidden">
+        <div className="bg-white p-4 rounded-xl border border-stone-100 shadow-sm border-l-4 border-l-primary-500">
+          <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-wider">Utilization</p>
+          <p className="text-2xl font-bold text-stone-900 mt-1">{utilization}%</p>
+          <div className="w-full bg-stone-100 h-1.5 rounded-full mt-2 overflow-hidden">
             <div className="bg-primary-500 h-full" style={{width: `${utilization}%`}}></div>
           </div>
         </div>
       </div>
 
-      <div className="space-y-8">
+      <div className="space-y-5">
 
         {/* Row 1: Weekly Activity & Forgotten Items */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="bg-white p-8 rounded-2xl border border-stone-100 shadow-sm flex flex-col h-[450px]">
-            <h3 className="text-xl font-bold text-stone-800 mb-6">Weekly Activity</h3>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div className="bg-white p-5 rounded-xl border border-stone-100 shadow-sm flex flex-col h-[300px]">
+            <h3 className="text-sm font-bold text-stone-800 mb-3">Weekly Activity</h3>
             <div className="flex-1">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={usageData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#a8a29e'}} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#a8a29e'}} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#a8a29e', fontSize: 11}} dy={5} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#a8a29e', fontSize: 11}} />
                   <Tooltip
                     cursor={{fill: '#f5f5f4'}}
-                    contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
+                    contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px'}}
                   />
-                  <Bar dataKey="wears" fill="#e05d45" radius={[6, 6, 0, 0]} barSize={40} />
+                  <Bar dataKey="wears" fill="#e05d45" radius={[4, 4, 0, 0]} barSize={28} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          <div className="bg-white p-8 rounded-2xl border-2 border-primary-100 shadow-lg flex flex-col h-[450px]">
-            <div className="flex items-center gap-2 mb-4">
-              <AlertCircle size={24} className="text-primary-500" />
-              <h3 className="text-xl font-bold text-stone-800">Forgotten items</h3>
+          <div className="bg-white p-5 rounded-xl border-2 border-primary-100 shadow-lg flex flex-col h-[300px]">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertCircle size={18} className="text-primary-500" />
+              <h3 className="text-sm font-bold text-stone-800">Forgotten items</h3>
             </div>
-            <p className="text-sm text-stone-500 mb-6 italic">These pieces haven't seen the light in over 30 days.</p>
-            <div className="flex-1 overflow-y-auto space-y-4 pr-2 no-scrollbar">
+            <p className="text-xs text-stone-500 mb-3 italic">These pieces haven't seen the light in over 30 days.</p>
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1 no-scrollbar">
               {(showAllForgotten ? forgottenItems : forgottenItems.slice(0, 6)).map(item => (
-                <div key={item.id} className="flex items-center gap-4 group cursor-pointer hover:bg-stone-50 p-2 -mx-2 rounded-xl transition-colors">
-                  <img src={item.image || '/placeholder-garment.svg'} className="w-14 h-14 rounded-lg object-cover bg-stone-100 shadow-sm" alt={item.name} />
-                  <div className="flex-1">
-                    <p className="font-semibold text-stone-800 text-sm">{item.name}</p>
-                    <p className="text-xs text-stone-400">Last worn: {item.lastWorn}</p>
+                <div key={item.id} className="flex items-center gap-3 group cursor-pointer hover:bg-stone-50 p-1.5 -mx-1.5 rounded-lg transition-colors">
+                  <img src={item.image || '/placeholder-garment.svg'} className="w-10 h-10 rounded-md object-cover bg-stone-100 shadow-sm" alt={item.name} />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-stone-800 text-xs truncate">{item.name}</p>
+                    <p className="text-[10px] text-stone-400">Last worn: {item.lastWorn}</p>
                   </div>
-                  <div className="text-[10px] font-bold text-primary-500 bg-primary-50 px-2 py-1 rounded">
+                  <div className="text-[9px] font-bold text-primary-500 bg-primary-50 px-1.5 py-0.5 rounded flex-shrink-0">
                     {Math.ceil(Math.abs(new Date().getTime() - new Date(item.lastWorn).getTime()) / (1000 * 60 * 60 * 24))}d ago
                   </div>
                   <button
                     onClick={(e) => { e.stopPropagation(); setPostponeModalItem(item.id); }}
-                    className="text-[10px] font-bold text-stone-400 hover:text-stone-900 uppercase tracking-widest border border-stone-200 px-2 py-1 rounded transition-colors"
+                    className="text-[9px] font-bold text-stone-400 hover:text-stone-900 uppercase tracking-widest border border-stone-200 px-1.5 py-0.5 rounded transition-colors flex-shrink-0"
                   >
                     Postpone
                   </button>
@@ -179,7 +179,7 @@ export const InsightsView: React.FC = () => {
             {forgottenItems.length > 6 && (
               <button
                 onClick={() => setShowAllForgotten(!showAllForgotten)}
-                className="w-full py-3 mt-6 border border-stone-200 text-stone-400 text-xs font-bold uppercase tracking-widest hover:border-primary-500 hover:text-primary-500 transition-all rounded-xl"
+                className="w-full py-2 mt-3 border border-stone-200 text-stone-400 text-[10px] font-bold uppercase tracking-widest hover:border-primary-500 hover:text-primary-500 transition-all rounded-lg"
               >
                 {showAllForgotten ? "Show Less" : "View All Forgotten"}
               </button>
@@ -188,13 +188,13 @@ export const InsightsView: React.FC = () => {
         </div>
 
         {/* Row 2: Category Split, Most Worn, Recent Outfits */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="bg-white p-8 rounded-2xl border border-stone-100 shadow-sm flex flex-col h-[480px]">
-            <h3 className="text-xl font-bold text-stone-800 mb-6">Category Split</h3>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="bg-white p-5 rounded-xl border border-stone-100 shadow-sm flex flex-col h-[320px]">
+            <h3 className="text-sm font-bold text-stone-800 mb-3">Category Split</h3>
             <div className="flex-1">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={categoryData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                  <Pie data={categoryData} cx="50%" cy="50%" innerRadius={45} outerRadius={65} paddingAngle={5} dataKey="value">
                     {categoryData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
@@ -203,62 +203,62 @@ export const InsightsView: React.FC = () => {
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <div className="flex flex-wrap gap-2 justify-center mt-4">
+            <div className="flex flex-wrap gap-2 justify-center mt-2">
               {categoryData.map((entry, idx) => (
-                <div key={entry.name} className="flex items-center gap-1.5 text-xs text-stone-500">
-                  <div className="w-2 h-2 rounded-full" style={{backgroundColor: COLORS[idx % COLORS.length]}}></div>
+                <div key={entry.name} className="flex items-center gap-1 text-[10px] text-stone-500">
+                  <div className="w-1.5 h-1.5 rounded-full" style={{backgroundColor: COLORS[idx % COLORS.length]}}></div>
                   {entry.name}
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="bg-white p-8 rounded-2xl border border-stone-100 shadow-sm flex flex-col h-[480px]">
-            <p className="text-stone-400 font-bold uppercase text-[10px] tracking-widest mb-4">Most Worn Item</p>
+          <div className="bg-white p-5 rounded-xl border border-stone-100 shadow-sm flex flex-col h-[320px]">
+            <p className="text-stone-400 font-bold uppercase text-[9px] tracking-widest mb-2">Most Worn Item</p>
             {mostWorn ? (
               <>
-                <h3 className="text-xl font-bold text-stone-800 mb-6">{mostWorn.name}</h3>
-                <div className="flex-1 aspect-square rounded-xl overflow-hidden mb-6 bg-stone-50 border border-stone-100">
+                <h3 className="text-sm font-bold text-stone-800 mb-3">{mostWorn.name}</h3>
+                <div className="flex-1 rounded-lg overflow-hidden mb-3 bg-stone-50 border border-stone-100">
                   <img src={mostWorn.image} alt={mostWorn.name} className="w-full h-full object-cover" />
                 </div>
                 <div className="flex justify-between items-end">
                   <div>
-                    <span className="text-3xl font-bold text-primary-500">{mostWorn.wearCount}</span>
-                    <span className="text-stone-400 text-sm ml-1">wears</span>
+                    <span className="text-xl font-bold text-primary-500">{mostWorn.wearCount}</span>
+                    <span className="text-stone-400 text-xs ml-1">wears</span>
                   </div>
                   <button
                     onClick={() => setSelectedItemInfo(mostWorn)}
-                    className="px-4 py-2 bg-stone-900 text-white rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-primary-600 transition-colors"
+                    className="px-3 py-1.5 bg-stone-900 text-white rounded-md text-[10px] font-bold uppercase tracking-widest hover:bg-primary-600 transition-colors"
                   >
                     Details
                   </button>
                 </div>
               </>
             ) : (
-              <div className="flex-1 flex items-center justify-center text-stone-300 font-serif italic">
+              <div className="flex-1 flex items-center justify-center text-stone-300 font-serif italic text-sm">
                 No items yet
               </div>
             )}
           </div>
 
-          <div className="bg-white p-8 rounded-2xl border border-stone-100 shadow-sm flex flex-col h-[480px]">
-            <h3 className="text-xl font-bold text-stone-800 mb-6">Recent Outfits</h3>
-            <div className="flex-1 overflow-y-auto space-y-4 no-scrollbar">
+          <div className="bg-white p-5 rounded-xl border border-stone-100 shadow-sm flex flex-col h-[320px]">
+            <h3 className="text-sm font-bold text-stone-800 mb-3">Recent Outfits</h3>
+            <div className="flex-1 overflow-y-auto space-y-2 no-scrollbar">
               {(showAllHistory ? outfits : outfits.slice(0, 5)).map((outfit) => (
                 <div
                   key={outfit.id}
                   onClick={() => setSelectedOutfit(outfit)}
-                  className="flex gap-4 p-3 hover:bg-stone-50 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-stone-100"
+                  className="flex gap-3 p-2 hover:bg-stone-50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-stone-100"
                 >
-                  <div className="grid grid-cols-2 gap-0.5 w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-stone-100 shadow-sm">
+                  <div className="grid grid-cols-2 gap-0.5 w-10 h-10 rounded-md overflow-hidden flex-shrink-0 bg-stone-100 shadow-sm">
                     {outfit.items.slice(0,4).map((itemId, i) => {
                       const item = wardrobe.find(w => w.id === itemId);
                       return item ? <img key={i} src={item.image || '/placeholder-garment.svg'} className="w-full h-full object-cover" /> : null
                     })}
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-stone-700">{outfit.date}</p>
-                    <p className="text-xs text-stone-400">{outfit.items.length} items worn</p>
+                    <p className="text-xs font-semibold text-stone-700">{outfit.date}</p>
+                    <p className="text-[10px] text-stone-400">{outfit.items.length} items worn</p>
                   </div>
                 </div>
               ))}
@@ -266,7 +266,7 @@ export const InsightsView: React.FC = () => {
             {outfits.length > 5 && (
               <button
                 onClick={() => setShowAllHistory(!showAllHistory)}
-                className="w-full py-3 mt-6 border border-stone-100 text-stone-400 text-[10px] font-bold uppercase tracking-widest hover:text-stone-800 transition-colors"
+                className="w-full py-2 mt-3 border border-stone-100 text-stone-400 text-[10px] font-bold uppercase tracking-widest hover:text-stone-800 transition-colors"
               >
                 {showAllHistory ? "Show Less" : "View History"}
               </button>

@@ -33,7 +33,7 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # ── Extensions ────────────────────────────────────────────────────────────────
 db.init_app(app)
-CORS(app, supports_credentials=True, origins=["http://localhost:3000"])
+CORS(app, supports_credentials=True, origins=["http://localhost:3000", "http://localhost:3001"])
 
 with app.app_context():
     db.create_all()

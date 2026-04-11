@@ -94,7 +94,22 @@ def update_item(item_id):
             item.postponed_until = None
 
     if "image" in data:
-        item.image_path = data["image"]
+        image_val = data["image"]
+        if image_val and image_val.startswith("data:image/"):
+            try:
+                mime_part, b64_part = image_val.split(",", 1)
+                ext = ".jpg"
+                if "png" in mime_part:
+                    ext = ".png"
+                image_bytes = base64.b64decode(b64_part)
+                filename = f"crop_{uuid.uuid4().hex}{ext}"
+                save_path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
+                with open(save_path, "wb") as f:
+                    f.write(image_bytes)
+                image_val = f"/uploads/{filename}"
+            except Exception as e:
+                logger.error("Failed to decode base64 item image: %s", e)
+        item.image_path = image_val
     db.session.commit()
     return jsonify(item_to_dict(item))
 

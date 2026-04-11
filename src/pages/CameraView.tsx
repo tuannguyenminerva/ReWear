@@ -219,7 +219,7 @@ export const CameraView: React.FC = () => {
   };
 
   return (
-    <div className="flex h-[calc(100vh-64px)] w-full overflow-hidden bg-stone-900">
+    <div className="flex h-[calc(100vh-80px)] w-full overflow-hidden bg-stone-900">
 
       {/* LEFT: Camera Feed */}
       <div className="relative flex-grow h-full bg-black overflow-hidden flex items-center justify-center group">
@@ -313,86 +313,86 @@ export const CameraView: React.FC = () => {
       <div className="w-[420px] flex-shrink-0 bg-[#fafaf9] border-l border-stone-200 flex flex-col h-full relative z-10 shadow-2xl">
 
         {/* Header */}
-        <div className="p-8 pb-4 bg-[#fafaf9]">
-          <h2 className="text-3xl font-serif italic text-stone-900">Daily Look</h2>
-          <div className="flex items-center gap-2 mt-3 border-b border-stone-200 pb-2">
-            <span className="text-xs font-bold tracking-widest uppercase text-stone-400">DATE</span>
+        <div className="px-6 pt-4 pb-2 bg-[#fafaf9]">
+          <h2 className="text-2xl font-serif italic text-stone-900">Daily Look</h2>
+          <div className="flex items-center gap-2 mt-2 border-b border-stone-200 pb-1.5">
+            <span className="text-[10px] font-bold tracking-widest uppercase text-stone-400">DATE</span>
             <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)}
               className="bg-transparent text-sm text-stone-600 font-serif focus:outline-none focus:text-primary-600 ml-auto text-right" />
           </div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-8 py-4 space-y-6">
+        <div className="flex-1 overflow-y-auto px-6 py-3 space-y-4">
           {detectedItems.length === 0 && !isLogSuccess ? (
             <div className="h-full flex flex-col items-center justify-center text-center opacity-50">
-              <div className="w-24 h-24 border border-stone-300 rounded-full flex items-center justify-center mb-6">
-                <Camera size={32} className="text-stone-300" />
+              <div className="w-16 h-16 border border-stone-300 rounded-full flex items-center justify-center mb-4">
+                <Camera size={24} className="text-stone-300" />
               </div>
-              <p className="font-serif text-xl italic text-stone-400 mb-2">Capture your style</p>
-              <p className="text-stone-400 text-xs uppercase tracking-widest max-w-[200px] leading-relaxed">
+              <p className="font-serif text-lg italic text-stone-400 mb-1">Capture your style</p>
+              <p className="text-stone-400 text-[10px] uppercase tracking-widest max-w-[200px] leading-relaxed">
                 Stand in frame and hit Capture, or upload a photo
               </p>
               <button onClick={() => fileInputRef.current?.click()}
-                className="mt-8 text-stone-800 text-xs font-bold uppercase tracking-widest border-b border-stone-800 pb-1 hover:text-primary-600 hover:border-primary-600 transition-colors">
+                className="mt-5 text-stone-800 text-xs font-bold uppercase tracking-widest border-b border-stone-800 pb-1 hover:text-primary-600 hover:border-primary-600 transition-colors">
                 Upload from Gallery
               </button>
             </div>
           ) : isLogSuccess ? (
             <div className="h-full flex flex-col items-center justify-center text-center animate-in zoom-in duration-500">
-              <div className="w-24 h-24 bg-stone-100 rounded-full flex items-center justify-center mb-6">
-                <Check size={32} className="text-stone-800" />
+              <div className="w-16 h-16 bg-stone-100 rounded-full flex items-center justify-center mb-4">
+                <Check size={24} className="text-stone-800" />
               </div>
-              <h3 className="text-3xl font-serif italic text-stone-900 mb-3">Logged.</h3>
-              <p className="text-stone-500 font-serif italic">"Style is a way to say who you are without having to speak."</p>
+              <h3 className="text-2xl font-serif italic text-stone-900 mb-2">Logged.</h3>
+              <p className="text-stone-500 font-serif italic text-sm">"Style is a way to say who you are without having to speak."</p>
             </div>
           ) : (
             <>
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-bold text-stone-400 uppercase tracking-[0.2em]">Curated Items</span>
                 {isDetecting && <span className="text-[10px] font-bold text-primary-500 uppercase tracking-widest animate-pulse">Detecting...</span>}
               </div>
 
-              <div className="space-y-8">
+              <div className="space-y-4">
                 {detectedItems.map((item, idx) => (
                   <div key={item.id} className="group relative animate-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: `${idx * 100}ms` }}>
                     <button onClick={() => removeItem(item.id)}
-                      className="absolute -top-2 -right-2 z-20 w-6 h-6 bg-white border border-stone-200 rounded-full flex items-center justify-center text-stone-400 hover:text-primary-600 hover:border-primary-600 transition-all opacity-0 group-hover:opacity-100 shadow-sm"
+                      className="absolute -top-1.5 -right-1.5 z-20 w-5 h-5 bg-white border border-stone-200 rounded-full flex items-center justify-center text-stone-400 hover:text-primary-600 hover:border-primary-600 transition-all opacity-0 group-hover:opacity-100 shadow-sm"
                       title="Remove item">
-                      <X size={12} />
+                      <X size={10} />
                     </button>
-                    <div className="flex gap-5 items-start">
-                      <div className="w-20 h-24 flex-shrink-0 overflow-hidden bg-stone-100 relative">
+                    <div className="flex gap-3 items-start">
+                      <div className="w-14 h-[4.5rem] flex-shrink-0 overflow-hidden bg-stone-100 relative">
                         <img src={item.image} alt={item.name} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" />
                         <div className="absolute inset-0 ring-1 ring-inset ring-black/5" />
                       </div>
-                      <div className="flex-1 min-w-0 pt-1">
+                      <div className="flex-1 min-w-0 pt-0.5">
                         {editingItemId === item.id ? (
-                          <div className="flex flex-col gap-2">
+                          <div className="flex flex-col gap-1.5">
                             <input type="text" value={editForm.name} onChange={(e) => setEditForm({...editForm, name: e.target.value})}
-                              className="w-full font-serif italic text-lg border-b border-primary-300 bg-transparent focus:outline-none focus:border-primary-500" autoFocus placeholder="Item Name"/>
+                              className="w-full font-serif italic text-base border-b border-primary-300 bg-transparent focus:outline-none focus:border-primary-500" autoFocus placeholder="Item Name"/>
                             <div className="flex gap-2">
                               <select value={editForm.category} onChange={(e) => setEditForm({...editForm, category: e.target.value as Category})}
-                                className="w-1/2 text-[10px] font-bold uppercase tracking-widest border-b border-primary-300 bg-transparent focus:outline-none focus:border-primary-500 pb-1 cursor-pointer">
+                                className="w-1/2 text-[10px] font-bold uppercase tracking-widest border-b border-primary-300 bg-transparent focus:outline-none focus:border-primary-500 pb-0.5 cursor-pointer">
                                 {['Top', 'Bottom', 'Shoes', 'Outerwear', 'Accessory'].map(c => <option key={c} value={c}>{c}</option>)}
                               </select>
                               <input type="text" value={editForm.color} onChange={(e) => setEditForm({...editForm, color: e.target.value})}
-                                className="w-1/2 text-[10px] font-bold uppercase tracking-widest border-b border-primary-300 bg-transparent focus:outline-none focus:border-primary-500 pb-1" placeholder="Color"/>
+                                className="w-1/2 text-[10px] font-bold uppercase tracking-widest border-b border-primary-300 bg-transparent focus:outline-none focus:border-primary-500 pb-0.5" placeholder="Color"/>
                             </div>
-                            <button onClick={() => saveEditing(item.id)} className="text-primary-600 font-bold uppercase text-[10px] mt-2 text-left self-start flex items-center gap-1 hover:text-primary-800"><Check size={14} /> Save Details</button>
+                            <button onClick={() => saveEditing(item.id)} className="text-primary-600 font-bold uppercase text-[10px] mt-1 text-left self-start flex items-center gap-1 hover:text-primary-800"><Check size={12} /> Save</button>
                           </div>
                         ) : (
                           <>
-                            <div className="flex items-center gap-2">
-                              <h4 className="font-serif text-xl text-stone-900 italic cursor-pointer hover:text-primary-600 transition-colors"
+                            <div className="flex items-center gap-1.5">
+                              <h4 className="font-serif text-base text-stone-900 italic cursor-pointer hover:text-primary-600 transition-colors"
                                 onClick={() => startEditing(item)}>
                                 {item.name}
                               </h4>
-                              <button onClick={() => startEditing(item)} className="text-stone-400 hover:text-primary-600 transition-colors p-1" title="Edit Details">
-                                <Edit2 size={14} />
+                              <button onClick={() => startEditing(item)} className="text-stone-400 hover:text-primary-600 transition-colors p-0.5" title="Edit Details">
+                                <Edit2 size={12} />
                               </button>
                             </div>
-                            <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mt-1">{item.category}</p>
+                            <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest mt-0.5">{item.category}</p>
                           </>
                         )}
                       </div>
@@ -401,13 +401,13 @@ export const CameraView: React.FC = () => {
                 ))}
               </div>
 
-              <div className="flex gap-2 mt-8">
+              <div className="flex gap-2 mt-4">
                 <button onClick={() => setIsModalOpen(true)}
-                  className="flex-1 py-4 border border-primary-200 text-primary-600 text-[10px] font-bold uppercase tracking-widest hover:border-primary-600 hover:bg-primary-50 transition-all">
+                  className="flex-1 py-2.5 border border-primary-200 text-primary-600 text-[10px] font-bold uppercase tracking-widest hover:border-primary-600 hover:bg-primary-50 transition-all">
                   Browse Wardrobe
                 </button>
                 <button onClick={createBlankItem}
-                  className="flex-1 py-4 bg-stone-100 border border-transparent text-stone-600 text-[10px] font-bold uppercase tracking-widest hover:border-stone-300 transition-all">
+                  className="flex-1 py-2.5 bg-stone-100 border border-transparent text-stone-600 text-[10px] font-bold uppercase tracking-widest hover:border-stone-300 transition-all">
                   + New Item
                 </button>
               </div>
@@ -416,12 +416,12 @@ export const CameraView: React.FC = () => {
         </div>
 
         {/* Footer */}
-        <div className="p-8 bg-[#fafaf9]">
-          {logError && <p className="text-red-500 text-xs mb-3 text-center">{logError}</p>}
-          <div className="flex gap-3">
+        <div className="px-6 py-4 bg-[#fafaf9]">
+          {logError && <p className="text-red-500 text-xs mb-2 text-center">{logError}</p>}
+          <div className="flex gap-2">
             {(uploadedImage || detectedItems.length > 0) && !isLogSuccess && (
               <button disabled={isLogging} onClick={handleRetry}
-                className="px-6 py-4 text-xs font-bold uppercase tracking-widest bg-stone-200 text-stone-600 hover:bg-stone-300 transition-all flex items-center justify-center">
+                className="px-4 py-2.5 text-xs font-bold uppercase tracking-widest bg-stone-200 text-stone-600 hover:bg-stone-300 transition-all flex items-center justify-center">
                 Retry
               </button>
             )}
@@ -429,14 +429,14 @@ export const CameraView: React.FC = () => {
               disabled={detectedItems.length === 0 || isLogSuccess || isLogging}
               onClick={handleLogOutfit}
               className={`
-                flex-1 py-4 text-sm font-bold uppercase tracking-[0.15em] transition-all duration-500 flex items-center justify-center gap-2
+                flex-1 py-2.5 text-xs font-bold uppercase tracking-[0.15em] transition-all duration-500 flex items-center justify-center gap-2
                 ${detectedItems.length > 0 && !isLogSuccess && !isLogging
                   ? 'bg-primary-500 text-white hover:bg-primary-600 shadow-lg shadow-primary-500/20'
                   : 'bg-stone-100 text-stone-300 cursor-not-allowed'}
               `}
             >
               {isLogging
-                ? <><Loader2 size={16} className="animate-spin" /> Saving…</>
+                ? <><Loader2 size={14} className="animate-spin" /> Saving…</>
                 : isLogSuccess ? 'Saved to Journal' : 'Log Entry'
               }
             </button>
