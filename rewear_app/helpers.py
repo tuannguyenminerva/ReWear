@@ -1,8 +1,8 @@
 from flask import jsonify, session
 
-try:
+if __package__:
     from .models import db, User
-except ImportError:  # Allow running modules as local scripts
+else:
     from models import db, User
 
 

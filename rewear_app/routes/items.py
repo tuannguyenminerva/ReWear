@@ -7,10 +7,10 @@ from flask import Blueprint, request, jsonify, current_app
 from sqlalchemy.orm import joinedload
 from datetime import date, datetime
 
-try:
+if __package__:
     from ..models import db, Item, OutfitItem
     from ..helpers import require_auth, item_to_dict
-except ImportError:  # Allow local script execution
+else:
     from models import db, Item, OutfitItem
     from helpers import require_auth, item_to_dict
 
@@ -71,7 +71,7 @@ def create_item():
         category=data.get("category", "Top"),
         color=data.get("color", ""),
         brand=data.get("brand", ""),
-        cost=data.get("cost"),
+        cost=cost if "cost" in data and data["cost"] is not None else data.get("cost"),
         image_path=image_val,
         user_id=user.id,
     )

@@ -1,9 +1,9 @@
 from flask import Blueprint, request, jsonify, session
 
-try:
+if __package__:
     from ..models import db, User
     from ..helpers import require_auth
-except ImportError:  # Allow local script execution
+else:
     from models import db, User
     from helpers import require_auth
 

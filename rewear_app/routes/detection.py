@@ -5,10 +5,10 @@ from flask import Blueprint, request, jsonify
 import cv2
 import numpy as np
 
-try:
+if __package__:
     from ..helpers import require_auth
     from ..detector import detect_clothing
-except ImportError:  # Allow local script execution
+else:
     from helpers import require_auth
     from detector import detect_clothing
 

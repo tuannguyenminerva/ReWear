@@ -7,10 +7,10 @@ import logging
 logger = logging.getLogger(__name__)
 from datetime import date
 
-try:
+if __package__:
     from ..models import db, Item, Outfit, OutfitItem
     from ..helpers import require_auth, outfit_to_dict
-except ImportError:  # Allow local script execution
+else:
     from models import db, Item, Outfit, OutfitItem
     from helpers import require_auth, outfit_to_dict
 
@@ -67,7 +67,7 @@ def create_outfit():
         db.session.flush()
 
         # Fetch all items in one query to optimize performance and check ownership
-        item_ids_int = [int(iid) for iid in item_ids]
+        item_ids_int = list(set(int(iid) for iid in item_ids))
         items = db.session.execute(
             db.select(Item).where(Item.id.in_(item_ids_int))
         ).scalars().all()

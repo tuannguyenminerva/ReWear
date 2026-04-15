@@ -5,10 +5,10 @@ from flask import Flask
 from flask_cors import CORS
 from flask_migrate import Migrate
 
-try:
+if __package__:
     from .models import db
     from .routes import auth_bp, items_bp, outfits_bp, detection_bp
-except ImportError:  # Allow running as `python app.py` from this directory
+else:
     from models import db
     from routes import auth_bp, items_bp, outfits_bp, detection_bp
 
@@ -27,6 +27,7 @@ if not _secret_key:
 app.config['SECRET_KEY'] = _secret_key
 # Ensure database is in the instance folder relative to this file
 _db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance', 'database.db')
+os.makedirs(os.path.dirname(_db_path), exist_ok=True)
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{_db_path}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
