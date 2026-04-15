@@ -1,5 +1,9 @@
 from flask import jsonify, session
-from models import db, User
+
+try:
+    from .models import db, User
+except ImportError:  # Allow running modules as local scripts
+    from models import db, User
 
 
 def require_auth():
@@ -41,6 +45,7 @@ def item_to_dict(item):
         "addedDate": item.created_at.date().isoformat(),
         "postponedUntil": item.postponed_until.isoformat() if item.postponed_until else None,
         "cost": item.cost,
+        "isArchived": item.archived_at is not None
     }
 
 
