@@ -4,7 +4,7 @@ import os
 from flask import Flask
 from flask_cors import CORS
 from models import db
-from routes import auth_bp, items_bp, outfits_bp, detection_bp
+from routes import auth_bp, items_bp, outfits_bp, detection_bp, uploads_bp
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +43,7 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(items_bp)
 app.register_blueprint(outfits_bp)
 app.register_blueprint(detection_bp)
+app.register_blueprint(uploads_bp)
 
 
 @app.route("/")

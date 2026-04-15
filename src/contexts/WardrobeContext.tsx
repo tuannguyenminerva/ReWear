@@ -1,29 +1,9 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { ClothingItem, Outfit } from '../types';
-import { itemsApi, ApiItem } from '../api/items';
-import { outfitsApi, ApiOutfit } from '../api/outfits';
+import { itemsApi } from '../api/items';
+import { outfitsApi } from '../api/outfits';
+import { apiItemToClothing, apiOutfitToOutfit } from '../api/adapters';
 import { useAuth } from './AuthContext';
-
-// ── Adapters ──────────────────────────────────────────────────────────────────
-function apiItemToClothing(i: ApiItem): ClothingItem {
-  return {
-    id: i.id,
-    name: i.name,
-    category: i.category as ClothingItem['category'],
-    image: i.image,
-    wearCount: i.wearCount,
-    lastWorn: i.lastWorn,
-    color: i.color,
-    brand: i.brand,
-    addedDate: i.addedDate,
-    postponedUntil: i.postponedUntil,
-    cost: i.cost ?? undefined,
-  };
-}
-
-function apiOutfitToOutfit(o: ApiOutfit): Outfit {
-  return { id: o.id, date: o.date, items: o.items };
-}
 
 // ── Context ───────────────────────────────────────────────────────────────────
 interface WardrobeContextType {

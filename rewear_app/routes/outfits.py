@@ -1,10 +1,11 @@
 import os
 import uuid
 
-from flask import Blueprint, request, jsonify, current_app, send_from_directory
+from flask import Blueprint, request, jsonify, current_app
 from models import db, Item, Outfit, OutfitItem
 from datetime import date
-from helpers import require_auth, outfit_to_dict
+from auth_guard import require_auth
+from serializers import outfit_to_dict
 
 outfits_bp = Blueprint("outfits", __name__)
 
@@ -14,7 +15,12 @@ def get_outfits():
     user, err = require_auth()
     if err:
         return err
-    outfits = Outfit.query.filter_by(user_id=user.id).order_by(Outfit.worn_date.desc()).all()
+    outfits = (
+        Outfit.query
+        .filter_by(user_id=user.id)
+        .order_by(Outfit.worn_date.desc())
+        .all()
+    )
     return jsonify([outfit_to_dict(o) for o in outfits])
 
 
@@ -33,7 +39,9 @@ def create_outfit():
             f = request.files["image"]
             ext = os.path.splitext(f.filename)[1] if f.filename else '.jpg'
             filename = f"{uuid.uuid4().hex}{ext}"
-            save_path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
+            save_path = os.path.join(
+                current_app.config["UPLOAD_FOLDER"], filename
+            )
             f.save(save_path)
             image_path = f"/uploads/{filename}"
     else:
@@ -44,23 +52,24 @@ def create_outfit():
         image_path = data.get("image_path")
 
     try:
-        worn_date = date.fromisoformat(worn_date_str) if worn_date_str else date.today()
+        worn_date = (
+            date.fromisoformat(worn_date_str) if worn_date_str else date.today()
+        )
     except ValueError:
         worn_date = date.today()
 
-    outfit = Outfit(worn_date=worn_date, notes=notes, image_path=image_path, user_id=user.id)
+    outfit = Outfit(
+        worn_date=worn_date, notes=notes, image_path=image_path, user_id=user.id
+    )
     db.session.add(outfit)
     db.session.flush()
 
     for iid in item_ids:
         item = Item.query.filter_by(id=int(iid), user_id=user.id).first()
         if item:
-            db.session.add(OutfitItem(outfit_id=outfit.id, item_id=item.id, user_action="user_added"))
+            db.session.add(OutfitItem(
+                outfit_id=outfit.id, item_id=item.id, user_action="user_added"
+            ))
 
     db.session.commit()
     return jsonify(outfit_to_dict(outfit)), 201
-
-
-@outfits_bp.route("/uploads/<string:filename>")
-def uploaded_file(filename):
-    return send_from_directory(current_app.config["UPLOAD_FOLDER"], filename)

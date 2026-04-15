@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, session
 from models import db, User
-from helpers import require_auth
+from auth_guard import require_auth
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -27,7 +27,10 @@ def register():
     db.session.commit()
 
     session["user_id"] = user.id
-    return jsonify({"message": "User registered", "user": {"id": user.id, "email": user.email, "username": user.username}}), 201
+    return jsonify({
+        "message": "User registered",
+        "user": {"id": user.id, "email": user.email, "username": user.username},
+    }), 201
 
 
 @auth_bp.route("/auth/login", methods=["POST"])
@@ -44,7 +47,10 @@ def login():
         return jsonify({"error": "Invalid credentials"}), 401
 
     session["user_id"] = user.id
-    return jsonify({"message": "Logged in", "user": {"id": user.id, "email": user.email, "username": user.username}})
+    return jsonify({
+        "message": "Logged in",
+        "user": {"id": user.id, "email": user.email, "username": user.username},
+    })
 
 
 @auth_bp.route("/auth/logout", methods=["POST"])
@@ -58,4 +64,6 @@ def me():
     user, err = require_auth()
     if err:
         return err
-    return jsonify({"id": user.id, "email": user.email, "username": user.username})
+    return jsonify({
+        "user": {"id": user.id, "email": user.email, "username": user.username},
+    })

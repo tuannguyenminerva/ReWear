@@ -1,4 +1,4 @@
-import { request, BASE } from './client';
+import { request } from './client';
 
 export interface ApiOutfit {
   id: string;
@@ -15,17 +15,7 @@ export const outfitsApi = {
       form.append('date', wornDate);
       itemIds.forEach(id => form.append('item_ids', id));
       form.append('image', image);
-      return fetch(`${BASE}/outfits`, {
-        method: 'POST',
-        credentials: 'include',
-        body: form,
-      }).then(async res => {
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
-        }
-        return res.json();
-      });
+      return request<ApiOutfit>('/outfits', { method: 'POST', body: form });
     }
     return request<ApiOutfit>('/outfits', {
       method: 'POST',

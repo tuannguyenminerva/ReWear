@@ -7,7 +7,7 @@ export interface AuthUser {
 }
 
 export const authApi = {
-  me: () => request<AuthUser>('/auth/me'),
+  me: () => request<{ user: AuthUser }>('/auth/me'),
   register: (email: string, password: string, name?: string) =>
     request<{ user: AuthUser }>('/auth/register', {
       method: 'POST',

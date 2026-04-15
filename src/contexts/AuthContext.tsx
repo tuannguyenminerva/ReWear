@@ -18,7 +18,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Check session on mount
   useEffect(() => {
     authApi.me()
-      .then(setUser)
+      .then(({ user }) => setUser(user))
       .catch(() => setUser(null))
       .finally(() => setLoading(false));
   }, []);
