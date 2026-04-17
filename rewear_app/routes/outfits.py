@@ -2,9 +2,17 @@ import os
 import uuid
 
 from flask import Blueprint, request, jsonify, current_app, send_from_directory
-from models import db, Item, Outfit, OutfitItem
+from sqlalchemy.orm import joinedload
+import logging
+logger = logging.getLogger(__name__)
 from datetime import date
-from helpers import require_auth, outfit_to_dict
+
+if __package__:
+    from ..models import db, Item, Outfit, OutfitItem
+    from ..helpers import require_auth, outfit_to_dict
+else:
+    from models import db, Item, Outfit, OutfitItem
+    from helpers import require_auth, outfit_to_dict
 
 outfits_bp = Blueprint("outfits", __name__)
 
@@ -14,7 +22,12 @@ def get_outfits():
     user, err = require_auth()
     if err:
         return err
-    outfits = Outfit.query.filter_by(user_id=user.id).order_by(Outfit.worn_date.desc()).all()
+    outfits = db.session.execute(
+        db.select(Outfit)
+        .where(Outfit.user_id == user.id)
+        .order_by(Outfit.worn_date.desc())
+        .options(joinedload(Outfit.outfit_items))
+    ).unique().scalars().all()
     return jsonify([outfit_to_dict(o) for o in outfits])
 
 
@@ -48,17 +61,43 @@ def create_outfit():
     except ValueError:
         worn_date = date.today()
 
-    outfit = Outfit(worn_date=worn_date, notes=notes, image_path=image_path, user_id=user.id)
-    db.session.add(outfit)
-    db.session.flush()
+    try:
+        outfit = Outfit(worn_date=worn_date, notes=notes, image_path=image_path, user_id=user.id)
+        db.session.add(outfit)
+        db.session.flush()
 
-    for iid in item_ids:
-        item = Item.query.filter_by(id=int(iid), user_id=user.id).first()
-        if item:
+        # Fetch all items in one query to optimize performance and check ownership
+        item_ids_int = list(set(int(iid) for iid in item_ids))
+        items = db.session.execute(
+            db.select(Item).where(Item.id.in_(item_ids_int))
+        ).scalars().all()
+
+        # Check ownership and existence for all items
+        found_item_ids = {item.id for item in items}
+        for item in items:
+            if item.user_id != user.id:
+                db.session.rollback()
+                return jsonify({"error": f"Forbidden: Item {item.id} does not belong to you"}), 403
+            if item.archived_at is not None:
+                db.session.rollback()
+                return jsonify({"error": f"Item {item.id} is archived and cannot be used"}), 400
+
+        # Validate that all requested items were found
+        for iid in item_ids_int:
+            if iid not in found_item_ids:
+                db.session.rollback()
+                return jsonify({"error": f"Item {iid} not found"}), 404
+
+        # Link items to outfit
+        for item in items:
             db.session.add(OutfitItem(outfit_id=outfit.id, item_id=item.id, user_action="user_added"))
 
-    db.session.commit()
-    return jsonify(outfit_to_dict(outfit)), 201
+        db.session.commit()
+        return jsonify(outfit_to_dict(outfit)), 201
+    except Exception as e:
+        db.session.rollback()
+        logger.error("Failed to create outfit: %s", e)
+        return jsonify({"error": "Database error"}), 500
 
 
 @outfits_bp.route("/uploads/<string:filename>")

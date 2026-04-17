@@ -1,6 +1,11 @@
 from flask import Blueprint, request, jsonify, session
-from models import db, User
-from helpers import require_auth
+
+if __package__:
+    from ..models import db, User
+    from ..helpers import require_auth
+else:
+    from models import db, User
+    from helpers import require_auth
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -18,16 +23,22 @@ def register():
     if not email or not password:
         return jsonify({"error": "Email and password required"}), 400
 
-    if User.query.filter_by(email=email).first():
-        return jsonify({"error": "User already exists"}), 409
+    import logging
+    try:
+        if db.session.scalar(db.select(User).where(User.email == email)):
+            return jsonify({"error": "User already exists"}), 409
 
-    user = User(email=email, username=username)
-    user.set_password(password)
-    db.session.add(user)
-    db.session.commit()
+        user = User(email=email, username=username)
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+        session["user_id"] = user.id
+        return jsonify({"message": "User registered", "user": {"id": user.id, "email": user.email, "username": user.username}}), 201
+    except Exception as e:
+        db.session.rollback()
+        logging.getLogger(__name__).error("Failed to register: %s", e)
+        return jsonify({"error": "Database error"}), 500
 
-    session["user_id"] = user.id
-    return jsonify({"message": "User registered", "user": {"id": user.id, "email": user.email, "username": user.username}}), 201
 
 
 @auth_bp.route("/auth/login", methods=["POST"])
@@ -39,7 +50,7 @@ def login():
     email = data.get("email")
     password = data.get("password")
 
-    user = User.query.filter_by(email=email).first()
+    user = db.session.scalar(db.select(User).where(User.email == email))
     if not user or not user.check_password(password):
         return jsonify({"error": "Invalid credentials"}), 401
 
