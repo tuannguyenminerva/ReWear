@@ -2,6 +2,8 @@ import base64
 import logging
 
 from flask import Blueprint, request, jsonify
+from auth_guard import require_auth
+from detector import detect_clothing
 import cv2
 import numpy as np
 
@@ -17,11 +19,8 @@ logger = logging.getLogger(__name__)
 detection_bp = Blueprint("detection", __name__)
 
 
-@detection_bp.route("/detect", methods=["POST", "OPTIONS"])
+@detection_bp.route("/detect", methods=["POST"])
 def detect():
-    if request.method == "OPTIONS":
-        return "", 204
-
     user, err = require_auth()
     if err:
         return err

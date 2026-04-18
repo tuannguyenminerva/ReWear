@@ -1,26 +1,15 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import { Camera, Check, Loader2, Upload, Edit2, X } from 'lucide-react';
 import { useWardrobe } from '../contexts/WardrobeContext';
 import { Category, ClothingItem } from '../types';
-import heic2any from 'heic2any';
-import { detectionApi } from '../api/detection';
 import { WardrobePickerModal } from '../components/WardrobePickerModal';
+import { useCameraCapture } from '../hooks/useCameraCapture';
+import { useImageUpload } from '../hooks/useImageUpload';
+import { useDetection } from '../hooks/useDetection';
 
 export const CameraView: React.FC = () => {
   const { wardrobe, addOutfit, addItem } = useWardrobe();
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const [stream, setStream] = useState<MediaStream | null>(null);
-  const [isDetecting, setIsDetecting] = useState(false);
-  const [detectedItems, setDetectedItems] = useState<ClothingItem[]>([]);
-  const [isLogging, setIsLogging] = useState(false);
-  const [isLogSuccess, setIsLogSuccess] = useState(false);
-  const [permissionError, setPermissionError] = useState(false);
-
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -28,134 +17,40 @@ export const CameraView: React.FC = () => {
     { name: '', category: 'Top', color: '' }
   );
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLogging, setIsLogging] = useState(false);
+  const [isLogSuccess, setIsLogSuccess] = useState(false);
   const [logError, setLogError] = useState('');
 
-  // ── Camera ──────────────────────────────────────────────────────────────────
-  const startCamera = async () => {
-    setPermissionError(false);
-    try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
-      setStream(mediaStream);
-      if (videoRef.current) videoRef.current.srcObject = mediaStream;
-    } catch {
-      setPermissionError(true);
-    }
-  };
+  // ── Hooks ───────────────────────────────────────────────────────────────────
+  const {
+    isDetecting, detectedItems, setDetectedItems,
+    apiError, noDetectionMsg, runDetection, resetDetection,
+  } = useDetection();
 
-  useEffect(() => {
-    startCamera();
-    return () => {
-      if (stream) stream.getTracks().forEach(t => t.stop());
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const { uploadedImage, uploadedFile, conversionError, handleFileUpload, reset: resetUpload } =
+    useImageUpload(runDetection);
 
-  const objectUrlRef = useRef<string | null>(null);
+  const handleCaptureFrame = useCallback((dataUrl: string, file: File) => {
+    resetUpload();
+    // imageUpload.reset clears uploadedFile; set it here via the capture path
+    // (useCameraCapture owns the File; we surface it through uploadedFile below)
+    runDetection(dataUrl);
+    // Store the captured file so addOutfit can attach it
+    setCapturedFile(file);
+  }, [runDetection, resetUpload]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    return () => {
-      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-    };
-  }, []);
+  const [capturedFile, setCapturedFile] = useState<File | null>(null);
 
-  // ── Capture frame from live camera ─────────────────────────────────────────
-  const captureFrame = useCallback(() => {
-    if (!videoRef.current || !canvasRef.current) return;
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.translate(canvas.width, 0);
-    ctx.scale(-1, 1);
-    ctx.drawImage(video, 0, 0);
-    canvas.toBlob(blob => {
-      if (!blob) return;
-      const file = new File([blob], `capture_${Date.now()}.jpg`, { type: 'image/jpeg' });
-      setUploadedFile(file);
-      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-      const url = URL.createObjectURL(blob);
-      objectUrlRef.current = url;
-      setUploadedImage(url);
-    }, 'image/jpeg', 0.85);
-    runDetection(canvas.toDataURL('image/jpeg', 0.85));
-  }, []);
+  const { videoRef, canvasRef, permissionError, startCamera, captureFrame } =
+    useCameraCapture((dataUrl, file) => {
+      setCapturedFile(file);
+      runDetection(dataUrl);
+    });
 
-  // ── Detection ────────────────────────────────────────────────────
-  const [apiError, setApiError] = useState<string | null>(null);
-  const [noDetectionMsg, setNoDetectionMsg] = useState(false);
+  // The file to attach to the outfit: prefer an uploaded file, fall back to a capture
+  const outfitFile = uploadedFile ?? capturedFile;
 
-  const runDetection = async (imageB64: string) => {
-    setIsDetecting(true);
-    setApiError(null);
-    setNoDetectionMsg(false);
-    try {
-      const data = await detectionApi.detect(imageB64);
-      if (data.detections?.length > 0) {
-        setDetectedItems(data.detections as ClothingItem[]);
-      } else {
-        setDetectedItems([]);
-        setNoDetectionMsg(true);
-        setTimeout(() => setNoDetectionMsg(false), 3000);
-      }
-    } catch (err: any) {
-      setApiError(err.message || "Failed to connect to detection server");
-    } finally {
-      setIsDetecting(false);
-    }
-  };
-
-  // ── File upload ─────────────────────────────────────────────────────────────
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files?.[0]) return;
-    let file = e.target.files[0];
-
-    if (file.name.toLowerCase().endsWith('.heic') || file.type === 'image/heic') {
-      try {
-        setIsDetecting(true);
-        const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.8 });
-        const blob = Array.isArray(converted) ? converted[0] : converted;
-        file = new File([blob], file.name.replace(/\.heic$/i, '.jpg'), { type: "image/jpeg" });
-      } catch (err) {
-        console.error("HEIC conversion error:", err);
-        setApiError("Could not convert HEIC format. Please try another image.");
-        setIsDetecting(false);
-        return;
-      }
-    }
-
-    setUploadedFile(file);
-
-    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-    const url = URL.createObjectURL(file);
-    objectUrlRef.current = url;
-    setUploadedImage(url);
-
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      let { width, height } = img;
-      const MAX_DIM = 1080;
-      if (width > MAX_DIM || height > MAX_DIM) {
-        const ratio = Math.min(MAX_DIM / width, MAX_DIM / height);
-        width *= ratio;
-        height *= ratio;
-      }
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, width, height);
-        ctx.drawImage(img, 0, 0, width, height);
-        runDetection(canvas.toDataURL('image/jpeg', 0.85));
-      }
-    };
-    img.src = url;
-  };
-
-  // ── Log outfit ──────────────────────────────────────────────────────────────
+  // ── Outfit logging ──────────────────────────────────────────────────────────
   const handleLogOutfit = async () => {
     if (detectedItems.length === 0) return;
     setIsLogging(true);
@@ -167,7 +62,7 @@ export const CameraView: React.FC = () => {
           return item;
         })
       );
-      await addOutfit(realItems, selectedDate, uploadedFile);
+      await addOutfit(realItems, selectedDate, outfitFile);
       setIsLogSuccess(true);
       setTimeout(() => handleRetry(), 3000);
     } catch (err: unknown) {
@@ -178,10 +73,9 @@ export const CameraView: React.FC = () => {
   };
 
   const handleRetry = () => {
-    setDetectedItems([]);
-    setUploadedImage(null);
-    setUploadedFile(null);
-    setApiError(null);
+    resetDetection();
+    resetUpload();
+    setCapturedFile(null);
     setLogError('');
     setIsLogSuccess(false);
     setEditingItemId(null);
@@ -206,7 +100,7 @@ export const CameraView: React.FC = () => {
       brand: '',
       addedDate: new Date().toISOString().split('T')[0],
       wearCount: 0,
-      lastWorn: 'Never'
+      lastWorn: 'Never',
     };
     setDetectedItems(prev => [...prev, newItem]);
     startEditing(newItem);
@@ -218,12 +112,15 @@ export const CameraView: React.FC = () => {
     setIsModalOpen(false);
   };
 
+  // The preview shown in the left panel: an uploaded/converted image takes priority
+  const previewImage = uploadedImage;
+
   return (
     <div className="flex h-[calc(100vh-80px)] w-full overflow-hidden bg-stone-900">
 
       {/* LEFT: Camera Feed */}
       <div className="relative flex-grow h-full bg-black overflow-hidden flex items-center justify-center group">
-        {permissionError && !uploadedImage ? (
+        {permissionError && !previewImage ? (
           <div className="text-center p-8 bg-stone-800 rounded-2xl max-w-md mx-4">
             <Camera className="w-12 h-12 text-stone-500 mx-auto mb-4" />
             <h3 className="text-white text-xl font-semibold mb-2">Camera Access Required</h3>
@@ -241,9 +138,9 @@ export const CameraView: React.FC = () => {
           </div>
         ) : (
           <>
-            {uploadedImage && (
+            {previewImage && (
               <div className="absolute inset-0 w-full h-full bg-stone-900 flex items-center justify-center z-20">
-                <img src={uploadedImage} alt="Uploaded look" className="w-full h-full object-contain" />
+                <img src={previewImage} alt="Uploaded look" className="w-full h-full object-contain" />
                 <button onClick={handleRetry} className="absolute top-8 right-8 p-3 bg-black/50 backdrop-blur-md text-white rounded-full hover:bg-black/70 transition-all z-30" title="Return to camera">
                   <Camera size={20} />
                 </button>
@@ -256,9 +153,9 @@ export const CameraView: React.FC = () => {
               <div className="absolute inset-0 border-[1px] border-white/20 m-8 rounded-3xl" />
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 border border-white/30 rounded-full animate-pulse" />
             </div>
-            {apiError && (
+            {(apiError || conversionError) && (
               <div className="absolute top-6 left-1/2 -translate-x-1/2 z-30 bg-red-500/90 text-white text-xs font-bold px-4 py-2 rounded-full backdrop-blur-sm">
-                {apiError}
+                {apiError ?? conversionError}
               </div>
             )}
             {noDetectionMsg && !apiError && (
@@ -300,7 +197,7 @@ export const CameraView: React.FC = () => {
             className="flex items-center gap-2 px-5 py-2.5 bg-stone-800/80 backdrop-blur-md border border-stone-600 text-white rounded-full text-xs font-bold uppercase tracking-widest hover:bg-stone-700 transition-all">
             <Upload size={14} /> Upload
           </button>
-          {!uploadedImage && !permissionError && (
+          {!previewImage && !permissionError && (
             <button onClick={captureFrame}
               className="flex items-center gap-2 px-5 py-2.5 bg-primary-500/90 backdrop-blur-md border border-primary-400 text-white rounded-full text-xs font-bold uppercase tracking-widest hover:bg-primary-600 transition-all">
               <Camera size={14} /> Capture
@@ -419,7 +316,7 @@ export const CameraView: React.FC = () => {
         <div className="px-6 py-4 bg-[#fafaf9]">
           {logError && <p className="text-red-500 text-xs mb-2 text-center">{logError}</p>}
           <div className="flex gap-2">
-            {(uploadedImage || detectedItems.length > 0) && !isLogSuccess && (
+            {(previewImage || detectedItems.length > 0) && !isLogSuccess && (
               <button disabled={isLogging} onClick={handleRetry}
                 className="px-4 py-2.5 text-xs font-bold uppercase tracking-widest bg-stone-200 text-stone-600 hover:bg-stone-300 transition-all flex items-center justify-center">
                 Retry

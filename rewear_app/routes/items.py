@@ -6,13 +6,8 @@ import uuid
 from flask import Blueprint, request, jsonify, current_app
 from sqlalchemy.orm import joinedload
 from datetime import date, datetime
-
-if __package__:
-    from ..models import db, Item, OutfitItem
-    from ..helpers import require_auth, item_to_dict
-else:
-    from models import db, Item, OutfitItem
-    from helpers import require_auth, item_to_dict
+from auth_guard import require_auth
+from serializers import item_to_dict
 
 logger = logging.getLogger(__name__)
 
