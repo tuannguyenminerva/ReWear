@@ -19,7 +19,10 @@ if not _secret_key:
         'Set SECRET_KEY in your environment before deploying.'
     )
 app.config['SECRET_KEY'] = _secret_key
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+# Ensure database is in the instance folder relative to this file
+_db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance', 'database.db')
+os.makedirs(os.path.dirname(_db_path), exist_ok=True)
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{_db_path}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 _production = os.environ.get('PRODUCTION', '').lower() in ('1', 'true', 'yes')
@@ -33,10 +36,11 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # ── Extensions ────────────────────────────────────────────────────────────────
 db.init_app(app)
+Migrate(app, db, render_as_batch=True)
 CORS(app, supports_credentials=True, origins=["http://localhost:3000", "http://localhost:3001"])
 
-with app.app_context():
-    db.create_all()
+# db.create_all() is no longer needed as we are using Flask-Migrate.
+# Run 'flask db upgrade' from the terminal to apply schema changes.
 
 # ── Blueprints ────────────────────────────────────────────────────────────────
 app.register_blueprint(auth_bp)

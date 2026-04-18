@@ -7,6 +7,13 @@ from detector import detect_clothing
 import cv2
 import numpy as np
 
+if __package__:
+    from ..helpers import require_auth
+    from ..detector import detect_clothing
+else:
+    from helpers import require_auth
+    from detector import detect_clothing
+
 logger = logging.getLogger(__name__)
 
 detection_bp = Blueprint("detection", __name__)

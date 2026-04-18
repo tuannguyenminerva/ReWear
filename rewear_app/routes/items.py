@@ -4,7 +4,6 @@ import os
 import uuid
 
 from flask import Blueprint, request, jsonify, current_app
-from models import db, Item, OutfitItem
 from sqlalchemy.orm import joinedload
 from datetime import date, datetime
 from auth_guard import require_auth
@@ -20,14 +19,11 @@ def get_items():
     user, err = require_auth()
     if err:
         return err
-    items = (
-        Item.query
-        .filter_by(user_id=user.id, archived_at=None)
-        .options(
-            joinedload(Item.outfit_items).joinedload(OutfitItem.outfit)
-        )
-        .all()
-    )
+    items = db.session.execute(
+        db.select(Item)
+        .where(Item.user_id == user.id, Item.archived_at.is_(None))
+        .options(joinedload(Item.outfit_items).joinedload(OutfitItem.outfit))
+    ).unique().scalars().all()
     return jsonify([item_to_dict(i) for i in items])
 
 
@@ -39,6 +35,14 @@ def create_item():
     data = request.get_json()
     if not data or not data.get("name"):
         return jsonify({"error": "name is required"}), 400
+
+    if "cost" in data and data["cost"] is not None:
+        try:
+            cost = float(data["cost"])
+            if cost < 0:
+                return jsonify({"error": "Cost cannot be negative"}), 400
+        except ValueError:
+            return jsonify({"error": "Invalid cost value"}), 400
 
     image_val = data.get("image", "")
     if image_val and image_val.startswith("data:image/"):
@@ -62,12 +66,17 @@ def create_item():
         category=data.get("category", "Top"),
         color=data.get("color", ""),
         brand=data.get("brand", ""),
-        cost=data.get("cost"),
+        cost=cost if "cost" in data and data["cost"] is not None else data.get("cost"),
         image_path=image_val,
         user_id=user.id,
     )
-    db.session.add(item)
-    db.session.commit()
+    try:
+        db.session.add(item)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error("Failed to create item: %s", e)
+        return jsonify({"error": "Database error"}), 500
     return jsonify(item_to_dict(item)), 201
 
 
@@ -76,11 +85,22 @@ def update_item(item_id):
     user, err = require_auth()
     if err:
         return err
-    item = Item.query.filter_by(id=item_id, user_id=user.id).first()
-    if not item:
-        return jsonify({"error": "Not found"}), 404
+    item = db.session.get(Item, item_id)
+    if not item or item.archived_at is not None:
+        return jsonify({"error": "Item not found or already archived"}), 404
+    if item.user_id != user.id:
+        return jsonify({"error": "Forbidden"}), 403
 
     data = request.get_json() or {}
+    
+    # Validate cost if provided
+    if "cost" in data and data["cost"] is not None:
+        try:
+            cost = float(data["cost"])
+            if cost < 0:
+                return jsonify({"error": "Cost cannot be negative"}), 400
+        except ValueError:
+            return jsonify({"error": "Invalid cost value"}), 400
     for field in ("name", "category", "color", "brand", "cost", "image_path"):
         if field in data:
             setattr(item, field, data[field])
@@ -111,7 +131,12 @@ def update_item(item_id):
             except Exception as e:
                 logger.error("Failed to decode base64 item image: %s", e)
         item.image_path = image_val
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error("Failed to update item: %s", e)
+        return jsonify({"error": "Database error"}), 500
     return jsonify(item_to_dict(item))
 
 
@@ -120,9 +145,16 @@ def delete_item(item_id):
     user, err = require_auth()
     if err:
         return err
-    item = Item.query.filter_by(id=item_id, user_id=user.id).first()
-    if not item:
-        return jsonify({"error": "Not found"}), 404
+    item = db.session.get(Item, item_id)
+    if not item or item.archived_at is not None:
+        return jsonify({"error": "Item not found or already archived"}), 404
+    if item.user_id != user.id:
+        return jsonify({"error": "Forbidden"}), 403
     item.archived_at = datetime.utcnow()
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error("Failed to delete item: %s", e)
+        return jsonify({"error": "Database error"}), 500
     return jsonify({"message": "Archived"})

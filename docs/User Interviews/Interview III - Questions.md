@@ -12,3 +12,6 @@
 8. If you had to delete/modify one feature, what would it be?
 9. If you had to add one feature, what would it be?
 10. Do you have any comments on visual design?
+
+
+Link to the form where interviewers put answers - https://docs.google.com/forms/d/e/1FAIpQLScGptS3LRsFYKXu5NbBylhXD1xkFiWWZruZDmujFu41-yB52g/viewform?usp=publish-editor
