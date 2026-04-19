@@ -53,13 +53,36 @@ db.init_app(app)
 Migrate(app, db, render_as_batch=True)
 
 # CORS Configuration
+# In production, set CORS_ORIGINS to a comma-separated list of trusted domains
+# e.g. CORS_ORIGINS=https://rewear.app,https://www.rewear.app
 _cors_origins = os.environ.get('CORS_ORIGINS')
 if _cors_origins:
-    _cors_origins = [o.strip() for o in _cors_origins.split(',')]
-else:
+    _cors_origins = [o.strip() for o in _cors_origins.split(',') if o.strip()]
+    if not _cors_origins:
+        _cors_origins = None
+
+if not _cors_origins:
+    if _production:
+        raise RuntimeError(
+            "CORS_ORIGINS must be explicitly set in production. "
+            "Example: CORS_ORIGINS=https://rewear.app,https://www.rewear.app"
+        )
+    
+    logger.warning(
+        'CORS_ORIGINS not set — defaulting to http://localhost:3000. '
+        'Set CORS_ORIGINS before deploying to production.'
+    ) # Development fallback
     _cors_origins = ["http://localhost:3000"]
 
-CORS(app, supports_credentials=True, origins=_cors_origins)
+CORS(
+    app,
+    supports_credentials=True,
+    origins=_cors_origins,
+    # Explicitly whitelist the methods our API uses
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    # Explicitly whitelist headers the frontend sends
+    allow_headers=["Content-Type", "Authorization"],
+)
 
 # db.create_all() is no longer needed as we are using Flask-Migrate.
 # Run 'flask db upgrade' from the terminal to apply schema changes.

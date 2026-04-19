@@ -3,13 +3,12 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 from sklearn.cluster import KMeans
-from dotenv import load_dotenv
 import base64
 import uuid
 from datetime import date
+import logging
 
-# Ensure environment variables are loaded for this service
-load_dotenv()
+logger = logging.getLogger(__name__)
 
 # Lazy-loaded model singleton
 _model = None
@@ -79,16 +78,16 @@ def load_model() -> YOLO:
         try:
             # Try to load a fashion-specific model via HuggingFace hub
             from huggingface_hub import hf_hub_download
-            print(f"[detector] Attempting to download model from {repo_id}/{filename}...")
+            logger.info("Attempting to download model from %s/%s...", repo_id, filename)
             path = hf_hub_download(
                 repo_id=repo_id,
                 filename=filename,
             )
             _model = YOLO(path)
             _using_fashion_model = True
-            print(f"[detector] Successfully attached model resource: {repo_id}")
+            logger.info("Successfully attached model resource: %s", repo_id)
         except Exception as e:
-            print(f"[detector] Fashion model resource unavailable ({e}), attaching local fallback: {fallback_model}")
+            logger.warning("Fashion model resource unavailable (%s), attaching local fallback: %s", e, fallback_model)
             _model = YOLO(fallback_model)
             _using_fashion_model = False
     return _model

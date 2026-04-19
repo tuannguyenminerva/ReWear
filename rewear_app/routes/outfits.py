@@ -1,6 +1,3 @@
-import os
-import uuid
-
 from flask import Blueprint, request, jsonify, current_app
 from ..models import db, Item, Outfit, OutfitItem
 from datetime import date
@@ -38,6 +35,13 @@ def create_outfit():
         image_path = None
         if "image" in request.files:
             f = request.files["image"]
+            if not f.content_type or not f.content_type.startswith("image/"):
+                return jsonify({"error": "Only image files are allowed"}), 415
+            f.stream.seek(0, 2)
+            file_size = f.stream.tell()
+            f.stream.seek(0) 
+            if file_size > 10 * 1024 * 1024:
+                return jsonify({"error": "Image too large (max 10 MB)"}), 413
             image_path = StorageHandler.save_file(
                 f, current_app.config["UPLOAD_FOLDER"]
             )
