@@ -109,6 +109,20 @@ The Vite dev server proxies `/api/*` and `/uploads/*` requests to
 
 ---
 
+## Testing
+
+Unit tests were added for the backend Flask application and cover:
+
+- Authentication endpoints and session handling
+- Items CRUD operations and validation
+- Outfits creation and item assignment logic
+- SQLAlchemy models and database constraints
+- Serialization helpers for API responses
+
+Detailed instructions and the full test suite summary are available in [TESTING.md](TESTING.md) and [tests/README.md](tests/README.md).
+
+---
+
 # Introduction
 
 Fashion brands now produce nearly twice as much clothing as they did before 2000. The industry generates over 92 million tonnes of waste annually (Niinimäki et al., 2020). However, studies reveal that nearly 25% of clothing in closets is never used (de Wagenaar et al., 2022). Environmental harm and financial waste result from underutilization. **Rewear** helps users make the most of their current wardrobes by turning wardrobe tracking into a quick daily routine that shows wear patterns and recommends items they may have forgotten.
