@@ -231,3 +231,60 @@ class TestDeleteItem:
         
         response = authenticated_client.delete(f'/items/{item_id}')
         assert response.status_code == 403
+
+# ── Security Test: IDOR/BOLA Data Isolation ───────────────────────────────────
+
+def test_get_items_isolates_users(authenticated_client, db_session, registered_user):
+    """Test that GET /items strictly returns only the authenticated user's items."""
+    
+    # 1. Create a secondary user (User B) to test isolation
+    user_b = User(username="user_b", email="b@example.com", password_hash="hashed_dummy_pw")
+    db_session.add(user_b)
+    db_session.commit()
+
+    # 2. Create 2 items belonging to User A (the currently logged-in user)
+    item_a1 = Item(name="User A Shirt", category="Top", user_id=registered_user['id'])
+    item_a2 = Item(name="User A Pants", category="Bottom", user_id=registered_user['id'])
+    
+    # 3. Create 3 items belonging to User B
+    item_b1 = Item(name="User B Hat", category="Accessories", user_id=user_b.id)
+    item_b2 = Item(name="User B Shoes", category="Shoes", user_id=user_b.id)
+    item_b3 = Item(name="User B Socks", category="Accessories", user_id=user_b.id)
+
+    db_session.add_all([item_a1, item_a2, item_b1, item_b2, item_b3])
+    db_session.commit()
+
+    # 4. Fetch the items list while authenticated as User A
+    response = authenticated_client.get('/items')
+    
+    assert response.status_code == 200
+    data = response.json
+    
+    # 5. Assert exactly 2 items are returned
+    assert len(data) == 2
+    
+    # 6. Extract the IDs and Names from the response to verify contents
+    item_ids = [item['id'] for item in data]
+    item_names = [item['name'] for item in data]
+    
+    # Guarantee User A's items are present
+    assert item_a1.id in item_ids
+    assert item_a2.id in item_ids
+    assert "User A Shirt" in item_names
+    assert "User A Pants" in item_names
+    
+    # Guarantee User B's items are completely isolated and hidden
+    assert item_b1.id not in item_ids
+    assert item_b2.id not in item_ids
+    assert item_b3.id not in item_ids
+
+
+# ── Edge Case Test: Missing File Handling ─────────────────────────────────────
+
+def test_missing_file_returns_404(client):
+    """Test that requesting a non-existent uploaded file returns a 404 error."""
+    # Attempt to fetch a file that definitely does not exist in the uploads folder
+    response = client.get('/uploads/this_file_does_not_exist_123.jpg')
+    
+    # Assert that Flask gracefully handles the missing file with a 404
+    assert response.status_code == 404
