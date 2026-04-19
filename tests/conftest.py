@@ -5,28 +5,30 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from flask import Flask
 
 # Add rewear_app to path so imports work
 rewear_app_path = os.path.join(os.path.dirname(__file__), '..', 'rewear_app')
 if rewear_app_path not in sys.path:
     sys.path.insert(0, rewear_app_path)
 
-# Now import after path is set
-from app import db, app as flask_app
+# Import create_app instead of the global app instance
+from app import db, create_app 
 
 
 @pytest.fixture
 def app():
     """Create application for testing."""
-    # Use in-memory SQLite database for tests
-    flask_app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
-    flask_app.config['TESTING'] = True
-    flask_app.config['WTF_CSRF_ENABLED'] = False
+    # Spin up a fresh app instance specifically for testing
+    # Passing a test_config dictionary is standard practice
+    app = create_app({
+        'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
+        'TESTING': True,
+        'WTF_CSRF_ENABLED': False
+    })
     
-    with flask_app.app_context():
+    with app.app_context():
         db.create_all()
-        yield flask_app
+        yield app
         db.session.remove()
         db.drop_all()
 
