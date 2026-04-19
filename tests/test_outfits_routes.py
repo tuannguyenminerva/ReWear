@@ -5,7 +5,7 @@ import os
 from datetime import date
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'rewear_app'))
 
-from models import Item, Outfit, db
+from rewear_app.models import Item, Outfit, db
 
 
 class TestGetOutfits:
@@ -25,7 +25,7 @@ class TestGetOutfits:
     def test_get_outfits_with_outfits(self, client, authenticated_client, app, user_data):
         """Test get_outfits returns user's outfits."""
         with app.app_context():
-            from models import User
+            from rewear_app.models import User
             user = db.session.scalar(db.select(User).where(User.email == user_data['email']))
             
             outfit1 = Outfit(user_id=user.id, worn_date=date(2025, 1, 1))
@@ -41,7 +41,7 @@ class TestGetOutfits:
     def test_get_outfits_sorted_by_date(self, client, authenticated_client, app, user_data):
         """Test get_outfits sorts by worn_date descending."""
         with app.app_context():
-            from models import User
+            from rewear_app.models import User
             user = db.session.scalar(db.select(User).where(User.email == user_data['email']))
             
             outfit1 = Outfit(user_id=user.id, worn_date=date(2025, 1, 1))
@@ -67,7 +67,7 @@ class TestCreateOutfit:
     def test_create_outfit_success(self, client, authenticated_client, app, user_data):
         """Test successful outfit creation."""
         with app.app_context():
-            from models import User
+            from rewear_app.models import User
             user = db.session.scalar(db.select(User).where(User.email == user_data['email']))
             item = Item(name='Shirt', user_id=user.id)
             db.session.add(item)
@@ -104,7 +104,7 @@ class TestCreateOutfit:
     def test_create_outfit_with_items(self, client, authenticated_client, app, user_data):
         """Test outfit creation includes items."""
         with app.app_context():
-            from models import User
+            from rewear_app.models import User
             user = db.session.scalar(db.select(User).where(User.email == user_data['email']))
             item1 = Item(name='Shirt', user_id=user.id)
             item2 = Item(name='Jeans', user_id=user.id)
@@ -124,7 +124,7 @@ class TestCreateOutfit:
     def test_create_outfit_with_nonexistent_item(self, client, authenticated_client, app, user_data):
         """Test outfit creation ignores non-existent items."""
         with app.app_context():
-            from models import User
+            from rewear_app.models import User
             user = db.session.scalar(db.select(User).where(User.email == user_data['email']))
             item = Item(name='Shirt', user_id=user.id)
             db.session.add(item)
@@ -142,7 +142,7 @@ class TestCreateOutfit:
     def test_create_outfit_with_other_users_items(self, client, authenticated_client, app):
         """Test outfit creation ignores other user's items."""
         with app.app_context():
-            from models import User
+            from rewear_app.models import User
             other_user = User(email='other@example.com', password_hash='hash')
             db.session.add(other_user)
             db.session.commit()

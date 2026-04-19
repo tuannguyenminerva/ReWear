@@ -5,7 +5,7 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'rewear_app'))
 
-from models import Item, db
+from rewear_app.models import User, Item, db
 
 
 class TestGetItems:
@@ -25,7 +25,7 @@ class TestGetItems:
     def test_get_items_with_items(self, client, authenticated_client, app, user_data):
         """Test get_items returns user's items."""
         with app.app_context():
-            from models import User
+            from rewear_app.models import User
             user = db.session.scalar(db.select(User).where(User.email == user_data['email']))
             
             item1 = Item(name='Shirt', category='Top', user_id=user.id)
@@ -42,7 +42,7 @@ class TestGetItems:
         """Test get_items excludes archived items."""
         from datetime import datetime
         with app.app_context():
-            from models import User
+            from rewear_app.models import User
             user = db.session.scalar(db.select(User).where(User.email == user_data['email']))
             
             item1 = Item(name='Current Shirt', user_id=user.id)
@@ -127,7 +127,7 @@ class TestUpdateItem:
     def test_update_item_unauthenticated(self, client, app):
         """Test update_item fails when not authenticated."""
         with app.app_context():
-            from models import User
+            from rewear_app.models import User
             user = User(email='uniqueuser@example.com', password_hash='hash')
             db.session.add(user)
             db.session.commit()
@@ -142,7 +142,7 @@ class TestUpdateItem:
     def test_update_item_success(self, client, authenticated_client, app, user_data):
         """Test successful item update."""
         with app.app_context():
-            from models import User
+            from rewear_app.models import User
             user = db.session.scalar(db.select(User).where(User.email == user_data['email']))
             item = Item(name='Original', category='Top', user_id=user.id)
             db.session.add(item)
@@ -166,7 +166,7 @@ class TestUpdateItem:
     def test_update_item_forbidden(self, client, authenticated_client, app):
         """Test update_item fails for other user's item."""
         with app.app_context():
-            from models import User
+            from rewear_app.models import User
             other_user = User(email='other@example.com', password_hash='hash')
             db.session.add(other_user)
             db.session.commit()
@@ -182,7 +182,7 @@ class TestUpdateItem:
     def test_update_item_negative_cost(self, client, authenticated_client, app, user_data):
         """Test update_item fails with negative cost."""
         with app.app_context():
-            from models import User
+            from rewear_app.models import User
             user = db.session.scalar(db.select(User).where(User.email == user_data['email']))
             item = Item(name='Test', user_id=user.id)
             db.session.add(item)
@@ -199,7 +199,7 @@ class TestDeleteItem:
     def test_delete_item_unauthenticated(self, client, app):
         """Test delete_item fails when not authenticated."""
         with app.app_context():
-            from models import User
+            from rewear_app.models import User
             user = User(email='uniqueuser2@example.com', password_hash='hash')
             db.session.add(user)
             db.session.commit()
@@ -219,7 +219,7 @@ class TestDeleteItem:
     def test_delete_item_forbidden(self, client, authenticated_client, app):
         """Test delete_item fails for other user's item."""
         with app.app_context():
-            from models import User
+            from rewear_app.models import User
             other_user = User(email='other@example.com', password_hash='hash')
             db.session.add(other_user)
             db.session.commit()
@@ -264,7 +264,7 @@ def test_get_items_isolates_users(authenticated_client, db_session, registered_u
     assert len(data) == 2
     
     # 6. Extract the IDs and Names from the response to verify contents
-    item_ids = [item['id'] for item in data]
+    item_ids = [int(item['id']) for item in data]
     item_names = [item['name'] for item in data]
     
     # Guarantee User A's items are present

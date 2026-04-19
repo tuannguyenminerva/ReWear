@@ -5,8 +5,8 @@ import os
 from datetime import date, datetime, timedelta
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'rewear_app'))
 
-from models import User, Item, Outfit, OutfitItem, db
-from serializers import item_to_dict, outfit_to_dict
+from rewear_app.models import User, Item, Outfit, OutfitItem, db
+from rewear_app.serializers import item_to_dict, outfit_to_dict
 
 
 class TestItemToDict:

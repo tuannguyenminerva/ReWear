@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-@patch('routes.detection.detect_clothing')
+@patch('rewear_app.routes.detection.detect_clothing')
 def test_detect_oversized_image(mock_detect_clothing, authenticated_client):
     """Test that an image payload over 13MB returns 413 and skips processing."""
     # Create a dummy payload string that is exactly 13,000,001 characters long

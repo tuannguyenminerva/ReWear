@@ -6,21 +6,21 @@ from werkzeug.utils import secure_filename
 
 class StorageHandler:
     @staticmethod
+    def _get_provider():
+        """Factory method to return the configured storage strategy."""
+        from .services.storage_providers import LocalStorageProvider, S3StorageProvider
+        provider_type = os.environ.get('STORAGE_PROVIDER', 'LOCAL').upper()
+        
+        if provider_type == 'S3':
+            return S3StorageProvider()
+        return LocalStorageProvider()
+
+    @staticmethod
     def save_file(file_data, upload_folder, is_base64=False, ext='.jpg'):
         """
-        Save file data to the configured storage provider and return the accessible URL/Path.
-        Supports both Werkzeug FileStorage objects and base64 bytes.
-
-        Args:
-            file_data:     Raw bytes (when is_base64=True) or a Werkzeug FileStorage object.
-            upload_folder: Destination directory on the local filesystem.
-            is_base64:     Set True when file_data contains raw decoded bytes.
-            ext:           File extension to use when is_base64=True (e.g. '.png', '.webp').
-                           Ignored for FileStorage uploads — extension is taken from the filename.
+        Save file data using the configured strategy and return the accessible URL/Path.
         """
-        provider = os.environ.get('STORAGE_PROVIDER', 'LOCAL')
-
-        # Determine filename/extension
+        # Determine filename/extension (this remains platform-agnostic business logic)
         if is_base64:
             filename = f"crop_{uuid.uuid4().hex}{ext}"
         else:
@@ -28,22 +28,9 @@ class StorageHandler:
             ext = os.path.splitext(safe_name)[1] if safe_name else '.jpg'
             filename = f"{uuid.uuid4().hex}{ext}"
 
-        if provider == 'S3':
-            # This is where Boto3 logic would be added to support cloud storage.
-            # Example: s3.upload_fileobj(file_data, BUCKET, filename)
-            # return f"https://{BUCKET}.s3.amazonaws.com/{filename}"
-            raise NotImplementedError("S3 storage provider is not yet implemented. Please set STORAGE_PROVIDER=LOCAL.")
-
-        # Default: LOCAL Filesystem Storage
-        save_path = os.path.join(upload_folder, filename)
-        
-        if is_base64:
-            with open(save_path, "wb") as f:
-                f.write(file_data)
-        else:
-            file_data.save(save_path)
-            
-        return f"/uploads/{filename}"
+        # Get the strategy and delegate the execution
+        provider = StorageHandler._get_provider()
+        return provider.save(file_data, upload_folder, filename)
 
 
 
