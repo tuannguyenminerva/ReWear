@@ -7,54 +7,97 @@ ReWear/
 ├── src/                              # Frontend source code (React + TypeScript)
 │   ├── api/                          # API client modules
 │   │   ├── client.ts                 # Base fetch helper & config
+│   │   ├── adapters.ts               # Backend ↔ frontend shape mapping
 │   │   ├── auth.ts                   # Auth endpoints
 │   │   ├── items.ts                  # Wardrobe item endpoints
 │   │   ├── outfits.ts                # Outfit logging endpoints
 │   │   └── detection.ts              # Clothing detection endpoint
 │   ├── components/                   # Reusable UI components
+│   │   ├── Navbar.tsx                # Top navigation bar
 │   │   ├── CreateItemModal.tsx       # New wardrobe item form
 │   │   ├── ItemCard.tsx              # Item thumbnail card
-│   │   ├── ItemDetailModal.tsx       # Item info overlay
-│   │   ├── Navbar.tsx                # Top navigation bar
+│   │   ├── ItemDetailModal.tsx       # Compact item info overlay (Insights)
 │   │   ├── OutfitDetailModal.tsx     # Outfit info overlay
 │   │   ├── PostponeModal.tsx         # Forgotten-item postpone dialog
-│   │   └── WardrobePickerModal.tsx   # Manual item picker for outfits
+│   │   ├── WardrobePickerModal.tsx   # Manual item picker for outfits
+│   │   ├── WardrobeToolbar.tsx       # Wardrobe page header & filters
+│   │   ├── WardrobeGrid.tsx          # Item grid with delete + empty state
+│   │   ├── ItemDetailEditModal.tsx   # Wardrobe item detail/edit modal
+│   │   ├── ItemImagePanel.tsx        # Image side of the edit modal
+│   │   ├── ItemFactsGrid.tsx         # Facts grid (color, cost, postpone…)
+│   │   ├── CameraStage.tsx           # Live feed + bbox overlays + toolbar
+│   │   ├── DetectionPanel.tsx        # Right-side detected-items panel
+│   │   ├── DetectedItemRow.tsx       # Single detection row (inline edit)
+│   │   ├── InsightsHeroStats.tsx     # Top-of-Insights stat cards
+│   │   ├── WeeklyActivityChart.tsx   # Bar chart of weekly outfit logs
+│   │   ├── ForgottenItemsCard.tsx    # 30+ day unused items list
+│   │   ├── CategorySplitChart.tsx    # Wardrobe category donut
+│   │   ├── MostWornCard.tsx          # Highlights the most-worn item
+│   │   └── RecentOutfitsCard.tsx     # Recent outfit history list
 │   ├── contexts/                     # React context providers
 │   │   ├── AuthContext.tsx           # Authentication state
 │   │   └── WardrobeContext.tsx       # Wardrobe & outfit state
+│   ├── hooks/                        # Reusable React hooks
+│   │   ├── useCameraCapture.ts       # getUserMedia + frame capture
+│   │   ├── useImageUpload.ts         # File-to-base64 upload pipeline
+│   │   ├── useDetection.ts           # YOLO detection request state
+│   │   └── useInsightsData.ts        # Derived stats for the Insights page
 │   ├── pages/                        # Page-level views
 │   │   ├── CameraView.tsx            # Live camera & photo upload detection
+│   │   ├── WardrobeView.tsx          # Wardrobe management
 │   │   ├── InsightsView.tsx          # Wear analytics & charts
 │   │   ├── InstructionsView.tsx      # How-to guide
 │   │   ├── LoginView.tsx
-│   │   ├── RegisterView.tsx
-│   │   └── WardrobeView.tsx          # Wardrobe management
+│   │   └── RegisterView.tsx
 │   ├── App.tsx                       # Root component & routing
 │   ├── index.tsx                     # React entry point
 │   ├── index.css
 │   └── types.ts                      # Shared TypeScript types
 ├── rewear_app/                       # Backend (Python / Flask)
+│   ├── __init__.py
 │   ├── app.py                        # App factory, config & blueprint registration
 │   ├── models.py                     # SQLAlchemy database models
-│   ├── helpers.py                    # Shared utilities (auth, serializers)
+│   ├── serializers.py                # Model → JSON serializers
+│   ├── helpers.py                    # Shared utilities (storage handler)
+│   ├── auth_guard.py                 # Session-auth decorator
 │   ├── detector.py                   # YOLO clothing detection module
-│   └── routes/                       # Flask blueprints
-│       ├── auth.py                   # /auth/* endpoints
-│       ├── items.py                  # /items/* endpoints
-│       ├── outfits.py                # /outfits/* & /uploads/* endpoints
-│       └── detection.py              # /detect endpoint
+│   ├── routes/                       # Flask blueprints
+│   │   ├── __init__.py
+│   │   ├── auth.py                   # /auth/* endpoints
+│   │   ├── items.py                  # /items/* endpoints
+│   │   ├── outfits.py                # /outfits/* endpoints
+│   │   ├── uploads.py                # /uploads/* endpoint
+│   │   └── detection.py              # /detect endpoint
+│   └── services/                     # Service-layer business logic
+│       ├── __init__.py
+│       ├── base_service.py           # Template-method base class
+│       ├── exceptions.py             # Domain exception hierarchy
+│       ├── item_service.py           # Wardrobe item operations
+│       ├── outfit_service.py         # Outfit creation & wear updates
+│       ├── storage_providers.py      # Local / S3 storage strategies
+│       └── wardrobe_manager.py       # Cross-service orchestrator
+├── tests/                            # Pytest backend test suite
+├── migrations/                       # Flask-Migrate Alembic scripts
 ├── docs/                             # Course documentation
 │   ├── Computer Vision Research/
 │   ├── Feedback/
 │   ├── Initial Design Ideas/
+│   ├── Project Management/           # Notion export: tasks, meeting notes
 │   ├── User Interviews/
+│   ├── README.md                     # #designthinking write-up
 │   └── schema.png                    # Database schema diagram
 ├── public/                           # Static assets served by Vite
 ├── index.html                        # Vite entry HTML
 ├── vite.config.ts                    # Vite config (dev server, proxy, aliases)
 ├── tsconfig.json                     # TypeScript config
 ├── package.json                      # Frontend dependencies & scripts
-└── requirements.txt                  # Python dependencies
+├── pytest.ini                        # Pytest configuration
+├── requirements.txt                  # Python dependencies
+├── build.py                          # Production build helper
+├── Procfile                          # Process definitions for deployment
+├── .env.example                      # Sample environment variables
+├── TESTING.md                        # Backend test suite overview
+└── README.md
 ```
 
 ## Running the Application
