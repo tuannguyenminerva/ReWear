@@ -1,46 +1,55 @@
-import React, { useRef, useState, useCallback } from 'react';
-import { Camera, Check, Loader2, Upload, Edit2, X } from 'lucide-react';
+import React, { useRef, useState } from 'react';
 import { useWardrobe } from '../contexts/WardrobeContext';
 import { Category, ClothingItem } from '../types';
 import { WardrobePickerModal } from '../components/WardrobePickerModal';
+import { CameraStage } from '../components/CameraStage';
+import { DetectionPanel } from '../components/DetectionPanel';
+import { DetectedItemEditForm } from '../components/DetectedItemRow';
 import { useCameraCapture } from '../hooks/useCameraCapture';
 import { useImageUpload } from '../hooks/useImageUpload';
 import { useDetection } from '../hooks/useDetection';
 
+const today = () => new Date().toISOString().split('T')[0];
+
+/**
+ * "Log a look" page: stitches the camera/upload stage with the detection
+ * panel, and persists the chosen items as an outfit.
+ */
 export const CameraView: React.FC = () => {
   const { wardrobe, addOutfit, addItem } = useWardrobe();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(today);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<{ name: string; category: Category; color: string }>(
-    { name: '', category: 'Top', color: '' }
-  );
+  const [editForm, setEditForm] = useState<DetectedItemEditForm>({
+    name: '',
+    category: 'Top',
+    color: '',
+  });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLogging, setIsLogging] = useState(false);
   const [isLogSuccess, setIsLogSuccess] = useState(false);
   const [logError, setLogError] = useState('');
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [capturedFile, setCapturedFile] = useState<File | null>(null);
 
-  // ── Hooks ───────────────────────────────────────────────────────────────────
   const {
-    isDetecting, detectedItems, setDetectedItems,
-    apiError, noDetectionMsg, runDetection, resetDetection,
+    isDetecting,
+    detectedItems,
+    setDetectedItems,
+    apiError,
+    noDetectionMsg,
+    runDetection,
+    resetDetection,
   } = useDetection();
 
-  const { uploadedImage, uploadedFile, conversionError, handleFileUpload, reset: resetUpload } =
-    useImageUpload(runDetection);
-
-  const handleCaptureFrame = useCallback((dataUrl: string, file: File) => {
-    resetUpload();
-    // imageUpload.reset clears uploadedFile; set it here via the capture path
-    // (useCameraCapture owns the File; we surface it through uploadedFile below)
-    runDetection(dataUrl);
-    // Store the captured file so addOutfit can attach it
-    setCapturedFile(file);
-  }, [runDetection, resetUpload]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const [capturedFile, setCapturedFile] = useState<File | null>(null);
+  const {
+    uploadedImage,
+    uploadedFile,
+    conversionError,
+    handleFileUpload,
+    reset: resetUpload,
+  } = useImageUpload(runDetection);
 
   const { videoRef, canvasRef, permissionError, startCamera, captureFrame } =
     useCameraCapture((dataUrl, file) => {
@@ -49,30 +58,9 @@ export const CameraView: React.FC = () => {
       runDetection(dataUrl);
     });
 
-  // The file to attach to the outfit: prefer an uploaded file, fall back to a capture
+  // Uploaded file wins over the captured frame so the user's explicit choice sticks.
   const outfitFile = uploadedFile ?? capturedFile;
-
-  // ── Outfit logging ──────────────────────────────────────────────────────────
-  const handleLogOutfit = async () => {
-    if (detectedItems.length === 0) return;
-    setIsLogging(true);
-    setLogError('');
-    try {
-      const realItems = await Promise.all(
-        detectedItems.map(async (item) => {
-          if (item.id.startsWith('det-')) return await addItem(item);
-          return item;
-        })
-      );
-      await addOutfit(realItems, selectedDate, outfitFile);
-      setIsLogSuccess(true);
-      setTimeout(() => handleRetry(), 3000);
-    } catch (err: unknown) {
-      setLogError(err instanceof Error ? err.message : 'Failed to log outfit');
-    } finally {
-      setIsLogging(false);
-    }
-  };
+  const previewImage = uploadedImage || capturedImage;
 
   const handleRetry = () => {
     resetDetection();
@@ -84,274 +72,114 @@ export const CameraView: React.FC = () => {
     setEditingItemId(null);
   };
 
-  // ── Item editing ────────────────────────────────────────────────────────────
+  const handleLogOutfit = async () => {
+    if (detectedItems.length === 0) return;
+    setIsLogging(true);
+    setLogError('');
+    try {
+      const realItems = await Promise.all(
+        detectedItems.map((item) =>
+          item.id.startsWith('det-') ? addItem(item) : Promise.resolve(item)
+        )
+      );
+      await addOutfit(realItems, selectedDate, outfitFile);
+      setIsLogSuccess(true);
+      setTimeout(handleRetry, 3000);
+    } catch (err: unknown) {
+      setLogError(err instanceof Error ? err.message : 'Failed to log outfit');
+    } finally {
+      setIsLogging(false);
+    }
+  };
+
   const startEditing = (item: ClothingItem) => {
     setEditingItemId(item.id);
     setEditForm({ name: item.name, category: item.category, color: item.color });
   };
+
   const saveEditing = (id: string) => {
-    setDetectedItems(prev => prev.map(item => item.id === id ? { ...item, ...editForm } : item));
+    setDetectedItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, ...editForm } : item))
+    );
     setEditingItemId(null);
   };
+
   const createBlankItem = () => {
     const newItem: ClothingItem = {
       id: `det-manual-${Date.now()}`,
       name: 'New Item',
-      category: 'Top',
+      category: 'Top' as Category,
       color: '',
       image: '',
       brand: '',
-      addedDate: new Date().toISOString().split('T')[0],
+      addedDate: today(),
       wearCount: 0,
       lastWorn: 'Never',
     };
-    setDetectedItems(prev => [...prev, newItem]);
+    setDetectedItems((prev) => [...prev, newItem]);
     startEditing(newItem);
     setIsModalOpen(false);
   };
-  const removeItem = (id: string) => setDetectedItems(prev => prev.filter(item => item.id !== id));
-  const addItemManually = (item: ClothingItem) => {
-    if (!detectedItems.find(i => i.id === item.id)) setDetectedItems(prev => [...prev, item]);
+
+  const removeDetectedItem = (id: string) =>
+    setDetectedItems((prev) => prev.filter((item) => item.id !== id));
+
+  const addItemFromWardrobe = (item: ClothingItem) => {
+    if (!detectedItems.find((i) => i.id === item.id)) {
+      setDetectedItems((prev) => [...prev, item]);
+    }
     setIsModalOpen(false);
   };
 
-  // The preview shown in the left panel: an uploaded/converted image takes priority
-  const previewImage = uploadedImage || capturedImage;
+  const openFilePicker = () => fileInputRef.current?.click();
 
   return (
     <div className="flex h-[calc(100vh-80px)] w-full overflow-hidden bg-stone-900">
+      <CameraStage
+        videoRef={videoRef}
+        canvasRef={canvasRef}
+        fileInputRef={fileInputRef}
+        previewImage={previewImage}
+        permissionError={permissionError}
+        isDetecting={isDetecting}
+        isLogSuccess={isLogSuccess}
+        detectedItems={detectedItems}
+        apiError={apiError}
+        conversionError={conversionError}
+        noDetectionMsg={noDetectionMsg}
+        onStartCamera={startCamera}
+        onCapture={captureFrame}
+        onUploadClick={openFilePicker}
+        onFileChange={handleFileUpload}
+        onRetry={handleRetry}
+      />
 
-      {/* LEFT: Camera Feed */}
-      <div className="relative flex-grow h-full bg-black overflow-hidden flex items-center justify-center group">
-        {permissionError && !previewImage ? (
-          <div className="text-center p-8 bg-stone-800 rounded-2xl max-w-md mx-4">
-            <Camera className="w-12 h-12 text-stone-500 mx-auto mb-4" />
-            <h3 className="text-white text-xl font-semibold mb-2">Camera Access Required</h3>
-            <p className="text-stone-400 mb-6">
-              Enable camera access to use real-time detection, or upload a photo below.
-            </p>
-            <div className="flex flex-col gap-3">
-              <button onClick={startCamera} className="px-6 py-3 bg-primary-500 text-white rounded-full font-bold uppercase tracking-widest text-xs hover:bg-primary-600 transition-all">
-                Retry Access
-              </button>
-              <button onClick={() => fileInputRef.current?.click()} className="px-6 py-3 bg-stone-700 text-stone-300 rounded-full font-bold uppercase tracking-widest text-xs hover:bg-stone-600 transition-all">
-                Upload Photo Instead
-              </button>
-            </div>
-          </div>
-        ) : (
-          <>
-            {previewImage && (
-              <div className="absolute inset-0 w-full h-full bg-stone-900 flex items-center justify-center z-20">
-                <img src={previewImage} alt="Uploaded look" className="w-full h-full object-contain" />
-                <button onClick={handleRetry} className="absolute top-8 right-8 p-3 bg-black/50 backdrop-blur-md text-white rounded-full hover:bg-black/70 transition-all z-30" title="Return to camera">
-                  <Camera size={20} />
-                </button>
-              </div>
-            )}
-            <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover opacity-90 scale-x-[-1]" />
-
-            {/* Scanning Overlay */}
-            <div className={`absolute inset-0 pointer-events-none transition-opacity duration-1000 ${isDetecting ? 'opacity-100' : 'opacity-0'}`}>
-              <div className="absolute inset-0 border-[1px] border-white/20 m-8 rounded-3xl" />
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 border border-white/30 rounded-full animate-pulse" />
-            </div>
-            {(apiError || conversionError) && (
-              <div className="absolute top-6 left-1/2 -translate-x-1/2 z-30 bg-red-500/90 text-white text-xs font-bold px-4 py-2 rounded-full backdrop-blur-sm">
-                {apiError ?? conversionError}
-              </div>
-            )}
-            {noDetectionMsg && !apiError && (
-              <div className="absolute top-6 left-1/2 -translate-x-1/2 z-30 bg-black/60 text-white/80 text-xs px-4 py-2 rounded-full backdrop-blur-sm">
-                No clothing detected — try moving closer or adjusting lighting
-              </div>
-            )}
-
-            {/* Bounding Box Labels */}
-            {!isLogSuccess && detectedItems.map((item) => {
-              const bboxX: number = (item as any).bbox_x ?? 50;
-              const bboxY: number = (item as any).bbox_y ?? 50;
-              const bboxW: number = (item as any).bbox_w ?? 0;
-              const top = bboxY;
-              const left = bboxX + bboxW / 2;
-              return (
-                <div key={item.id} className="absolute flex flex-col items-center transition-all duration-700 ease-out animate-in fade-in zoom-in-95"
-                  style={{ top: `${top}%`, left: `${left}%`, width: '180px', transform: 'translateX(-50%)' }}>
-                  <div className="relative group cursor-pointer">
-                    <div className="absolute -inset-2 bg-white/10 backdrop-blur-sm rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <div className="w-3 h-3 bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.5)] animate-pulse" />
-                    <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-md text-stone-900 px-4 py-2 rounded-none shadow-sm min-w-[140px] text-center">
-                      <p className="font-serif text-sm italic">{item.name}</p>
-                      <p className="text-[10px] uppercase tracking-widest text-stone-500 mt-0.5">{item.category}</p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-
-            <canvas ref={canvasRef} className="hidden" />
-          </>
-        )}
-
-        {/* Bottom toolbar */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-          <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileUpload} />
-          <button onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 px-5 py-2.5 bg-stone-800/80 backdrop-blur-md border border-stone-600 text-white rounded-full text-xs font-bold uppercase tracking-widest hover:bg-stone-700 transition-all">
-            <Upload size={14} /> Upload
-          </button>
-          {!previewImage && !permissionError && (
-            <button onClick={captureFrame}
-              className="flex items-center gap-2 px-5 py-2.5 bg-primary-500/90 backdrop-blur-md border border-primary-400 text-white rounded-full text-xs font-bold uppercase tracking-widest hover:bg-primary-600 transition-all">
-              <Camera size={14} /> Capture
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* RIGHT: Detection Panel */}
-      <div className="w-[420px] flex-shrink-0 bg-[#fafaf9] border-l border-stone-200 flex flex-col h-full relative z-10 shadow-2xl">
-
-        {/* Header */}
-        <div className="px-6 pt-4 pb-2 bg-[#fafaf9]">
-          <h2 className="text-2xl font-serif italic text-stone-900">Daily Look</h2>
-          <div className="flex items-center gap-2 mt-2 border-b border-stone-200 pb-1.5">
-            <span className="text-[10px] font-bold tracking-widest uppercase text-stone-400">DATE</span>
-            <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)}
-              className="bg-transparent text-sm text-stone-600 font-serif focus:outline-none focus:text-primary-600 ml-auto text-right" />
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-3 space-y-4">
-          {detectedItems.length === 0 && !isLogSuccess ? (
-            <div className="h-full flex flex-col items-center justify-center text-center opacity-50">
-              <div className="w-16 h-16 border border-stone-300 rounded-full flex items-center justify-center mb-4">
-                <Camera size={24} className="text-stone-300" />
-              </div>
-              <p className="font-serif text-lg italic text-stone-400 mb-1">Capture your style</p>
-              <p className="text-stone-400 text-[10px] uppercase tracking-widest max-w-[200px] leading-relaxed">
-                Stand in frame and hit Capture, or upload a photo
-              </p>
-              <button onClick={() => fileInputRef.current?.click()}
-                className="mt-5 text-stone-800 text-xs font-bold uppercase tracking-widest border-b border-stone-800 pb-1 hover:text-primary-600 hover:border-primary-600 transition-colors">
-                Upload from Gallery
-              </button>
-            </div>
-          ) : isLogSuccess ? (
-            <div className="h-full flex flex-col items-center justify-center text-center animate-in zoom-in duration-500">
-              <div className="w-16 h-16 bg-stone-100 rounded-full flex items-center justify-center mb-4">
-                <Check size={24} className="text-stone-800" />
-              </div>
-              <h3 className="text-2xl font-serif italic text-stone-900 mb-2">Logged.</h3>
-              <p className="text-stone-500 font-serif italic text-sm">"Style is a way to say who you are without having to speak."</p>
-            </div>
-          ) : (
-            <>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-bold text-stone-400 uppercase tracking-[0.2em]">Curated Items</span>
-                {isDetecting && <span className="text-[10px] font-bold text-primary-500 uppercase tracking-widest animate-pulse">Detecting...</span>}
-              </div>
-
-              <div className="space-y-4">
-                {detectedItems.map((item, idx) => (
-                  <div key={item.id} className="group relative animate-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: `${idx * 100}ms` }}>
-                    <button onClick={() => removeItem(item.id)}
-                      className="absolute -top-1.5 -right-1.5 z-20 w-5 h-5 bg-white border border-stone-200 rounded-full flex items-center justify-center text-stone-400 hover:text-primary-600 hover:border-primary-600 transition-all opacity-0 group-hover:opacity-100 shadow-sm"
-                      title="Remove item">
-                      <X size={10} />
-                    </button>
-                    <div className="flex gap-3 items-start">
-                      <div className="w-14 h-[4.5rem] flex-shrink-0 overflow-hidden bg-stone-100 relative">
-                        <img src={item.image} alt={item.name} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" />
-                        <div className="absolute inset-0 ring-1 ring-inset ring-black/5" />
-                      </div>
-                      <div className="flex-1 min-w-0 pt-0.5">
-                        {editingItemId === item.id ? (
-                          <div className="flex flex-col gap-1.5">
-                            <input type="text" value={editForm.name} onChange={(e) => setEditForm({...editForm, name: e.target.value})}
-                              className="w-full font-serif italic text-base border-b border-primary-300 bg-transparent focus:outline-none focus:border-primary-500" autoFocus placeholder="Item Name"/>
-                            <div className="flex gap-2">
-                              <select value={editForm.category} onChange={(e) => setEditForm({...editForm, category: e.target.value as Category})}
-                                className="w-1/2 text-[10px] font-bold uppercase tracking-widest border-b border-primary-300 bg-transparent focus:outline-none focus:border-primary-500 pb-0.5 cursor-pointer">
-                                {['Top', 'Bottom', 'Shoes', 'Outerwear', 'Accessory'].map(c => <option key={c} value={c}>{c}</option>)}
-                              </select>
-                              <input type="text" value={editForm.color} onChange={(e) => setEditForm({...editForm, color: e.target.value})}
-                                className="w-1/2 text-[10px] font-bold uppercase tracking-widest border-b border-primary-300 bg-transparent focus:outline-none focus:border-primary-500 pb-0.5" placeholder="Color"/>
-                            </div>
-                            <button onClick={() => saveEditing(item.id)} className="text-primary-600 font-bold uppercase text-[10px] mt-1 text-left self-start flex items-center gap-1 hover:text-primary-800"><Check size={12} /> Save</button>
-                          </div>
-                        ) : (
-                          <>
-                            <div className="flex items-center gap-1.5">
-                              <h4 className="font-serif text-base text-stone-900 italic cursor-pointer hover:text-primary-600 transition-colors"
-                                onClick={() => startEditing(item)}>
-                                {item.name}
-                              </h4>
-                              <button onClick={() => startEditing(item)} className="text-stone-400 hover:text-primary-600 transition-colors p-0.5" title="Edit Details">
-                                <Edit2 size={12} />
-                              </button>
-                            </div>
-                            <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest mt-0.5">{item.category}</p>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex gap-2 mt-4">
-                <button onClick={() => setIsModalOpen(true)}
-                  className="flex-1 py-2.5 border border-primary-200 text-primary-600 text-[10px] font-bold uppercase tracking-widest hover:border-primary-600 hover:bg-primary-50 transition-all">
-                  Browse Wardrobe
-                </button>
-                <button onClick={createBlankItem}
-                  className="flex-1 py-2.5 bg-stone-100 border border-transparent text-stone-600 text-[10px] font-bold uppercase tracking-widest hover:border-stone-300 transition-all">
-                  + New Item
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="px-6 py-4 bg-[#fafaf9]">
-          {logError && <p className="text-red-500 text-xs mb-2 text-center">{logError}</p>}
-          <div className="flex gap-2">
-            {(previewImage || detectedItems.length > 0) && !isLogSuccess && (
-              <button disabled={isLogging} onClick={handleRetry}
-                className="px-4 py-2.5 text-xs font-bold uppercase tracking-widest bg-stone-200 text-stone-600 hover:bg-stone-300 transition-all flex items-center justify-center">
-                Retry
-              </button>
-            )}
-            <button
-              disabled={detectedItems.length === 0 || isLogSuccess || isLogging}
-              onClick={handleLogOutfit}
-              className={`
-                flex-1 py-2.5 text-xs font-bold uppercase tracking-[0.15em] transition-all duration-500 flex items-center justify-center gap-2
-                ${detectedItems.length > 0 && !isLogSuccess && !isLogging
-                  ? 'bg-primary-500 text-white hover:bg-primary-600 shadow-lg shadow-primary-500/20'
-                  : 'bg-stone-100 text-stone-300 cursor-not-allowed'}
-              `}
-            >
-              {isLogging
-                ? <><Loader2 size={14} className="animate-spin" /> Saving…</>
-                : isLogSuccess ? 'Saved to Journal' : 'Log Entry'
-              }
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <style>{`
-        @keyframes scan { 0%{top:0%;opacity:0} 10%{opacity:1} 90%{opacity:1} 100%{top:100%;opacity:0} }
-      `}</style>
+      <DetectionPanel
+        selectedDate={selectedDate}
+        onDateChange={setSelectedDate}
+        detectedItems={detectedItems}
+        isDetecting={isDetecting}
+        isLogSuccess={isLogSuccess}
+        isLogging={isLogging}
+        hasPreviewImage={!!previewImage}
+        logError={logError}
+        editingItemId={editingItemId}
+        editForm={editForm}
+        onEditFormChange={setEditForm}
+        onStartEdit={startEditing}
+        onSaveEdit={saveEditing}
+        onRemoveItem={removeDetectedItem}
+        onUploadClick={openFilePicker}
+        onBrowseWardrobe={() => setIsModalOpen(true)}
+        onCreateBlank={createBlankItem}
+        onLogOutfit={handleLogOutfit}
+        onRetry={handleRetry}
+      />
 
       {isModalOpen && (
         <WardrobePickerModal
           wardrobe={wardrobe}
-          onSelect={addItemManually}
+          onSelect={addItemFromWardrobe}
           onCreateBlank={createBlankItem}
           onClose={() => setIsModalOpen(false)}
         />

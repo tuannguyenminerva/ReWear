@@ -1,20 +1,22 @@
+"""Wardrobe item endpoints — list, create, update, soft-delete."""
+
 import base64
 import logging
-import os
-import uuid
-
-from flask import Blueprint, request, jsonify, current_app
-from sqlalchemy.orm import joinedload
 from datetime import date, datetime
+
+from flask import Blueprint, current_app, jsonify, request
+
 from ..auth_guard import require_auth
-from ..serializers import item_to_dict
 from ..helpers import StorageHandler
-from ..models import db, Item, OutfitItem
+from ..models import Item, db
+from ..serializers import item_to_dict
+from ..services.exceptions import ServiceError
+from ..services.item_service import ItemService
+from ..services.wardrobe_manager import Wardrobe
 
 logger = logging.getLogger(__name__)
 
-# Maps MIME sub-types (from data-URL headers) to file extensions.
-# Covers the formats a browser or desktop OS is likely to produce.
+# Common image MIME sub-types → on-disk extensions for data-URL uploads.
 _MIME_TO_EXT: dict[str, str] = {
     "jpeg": ".jpg",
     "jpg":  ".jpg",
@@ -27,13 +29,10 @@ _MIME_TO_EXT: dict[str, str] = {
 
 
 def _ext_from_mime(mime_part: str) -> str:
-    """Return the file extension for a data-URL MIME header.
+    """Extract a file extension from a data-URL MIME header.
 
-    Example input:  'data:image/png;base64'
-    Example output: '.png'
-    Falls back to '.jpg' for unknown types.
+    e.g. ``'data:image/png;base64'`` → ``'.png'``. Falls back to ``'.jpg'``.
     """
-    # mime_part looks like 'data:image/png;base64'
     try:
         subtype = mime_part.split("/")[1].split(";")[0].lower()
     except IndexError:
@@ -46,66 +45,67 @@ items_bp = Blueprint("items", __name__)
 
 @items_bp.route("/items", methods=["GET"])
 def get_items():
+    """Return every active (non-archived) item in the user's wardrobe."""
     user, err = require_auth()
     if err:
         return err
-        
-    from ..services.wardrobe_manager import Wardrobe
+
     wardrobe = Wardrobe(user.id)
     return jsonify([item_to_dict(item) for item in wardrobe])
 
 
 @items_bp.route("/items", methods=["POST"])
 def create_item():
+    """Add a new item to the wardrobe."""
     user, err = require_auth()
     if err:
         return err
-        
-    data = request.get_json()
-    from ..services.item_service import ItemService
-    from ..services.exceptions import ServiceError
-    
+
     try:
-        service = ItemService()
-        item = service.create(user_id=user.id, data=data)
+        item = ItemService().create(user_id=user.id, data=request.get_json())
         return jsonify(item_to_dict(item)), 201
-    except ServiceError as e:
-        return jsonify({"error": str(e)}), e.code
-    except Exception as e:
-        logger.error("Failed to create item: %s", e)
-        return jsonify({"error": "Internal server error"}), 500
+    except ServiceError as exc:
+        return jsonify({"error": str(exc)}), exc.code
+    except Exception as exc:
+        logger.error("Failed to create item: %s", exc)
+        return jsonify({"error": "Could not save item, please try again"}), 500
 
 
 @items_bp.route("/items/<int:item_id>", methods=["PUT"])
 def update_item(item_id):
+    """Update mutable fields on an item the caller owns."""
     user, err = require_auth()
     if err:
         return err
+
     item = db.session.get(Item, item_id)
     if not item or item.archived_at is not None:
         return jsonify({"error": "Item not found or already archived"}), 404
     if item.user_id != user.id:
-        return jsonify({"error": "Forbidden"}), 403
+        return jsonify({"error": "You do not have permission to edit this item"}), 403
 
     data = request.get_json() or {}
-    
-    # Validate cost if provided
+
+    # Cost is the only field that needs server-side range validation.
     if "cost" in data and data["cost"] is not None:
         try:
-            cost = float(data["cost"])
-            if cost < 0:
+            if float(data["cost"]) < 0:
                 return jsonify({"error": "Cost cannot be negative"}), 400
-        except ValueError:
+        except (TypeError, ValueError):
             return jsonify({"error": "Invalid cost value"}), 400
+
     for field in ("name", "category", "color", "brand", "cost", "image_path"):
         if field in data:
             setattr(item, field, data[field])
 
     if "postponedUntil" in data:
-        if data["postponedUntil"]:
+        raw_postpone = data["postponedUntil"]
+        if raw_postpone:
             try:
-                item.postponed_until = date.fromisoformat(data["postponedUntil"])
+                item.postponed_until = date.fromisoformat(raw_postpone)
             except ValueError:
+                # Silently ignore unparseable dates rather than 400 — the rest
+                # of the update is still valid and the client can retry.
                 pass
         else:
             item.postponed_until = None
@@ -115,38 +115,46 @@ def update_item(item_id):
         if image_val and image_val.startswith("data:image/"):
             try:
                 mime_part, b64_part = image_val.split(",", 1)
-                ext = _ext_from_mime(mime_part)
                 image_bytes = base64.b64decode(b64_part)
                 image_val = StorageHandler.save_file(
-                    image_bytes, current_app.config["UPLOAD_FOLDER"], is_base64=True, ext=ext
+                    image_bytes,
+                    current_app.config["UPLOAD_FOLDER"],
+                    is_base64=True,
+                    ext=_ext_from_mime(mime_part),
                 )
-            except Exception as e:
-                logger.error("Failed to process item image: %s", e)
+            except Exception as exc:
+                # Keep the existing image_path on failure; log and move on.
+                logger.error("Failed to process item image: %s", exc)
+                image_val = item.image_path
         item.image_path = image_val
+
     try:
         db.session.commit()
-    except Exception as e:
+    except Exception as exc:
         db.session.rollback()
-        logger.error("Failed to update item: %s", e)
-        return jsonify({"error": "Database error"}), 500
+        logger.error("Failed to update item %s: %s", item_id, exc)
+        return jsonify({"error": "Could not save changes, please try again"}), 500
     return jsonify(item_to_dict(item))
 
 
 @items_bp.route("/items/<int:item_id>", methods=["DELETE"])
 def delete_item(item_id):
+    """Soft-delete an item by setting ``archived_at``."""
     user, err = require_auth()
     if err:
         return err
+
     item = db.session.get(Item, item_id)
     if not item or item.archived_at is not None:
         return jsonify({"error": "Item not found or already archived"}), 404
     if item.user_id != user.id:
-        return jsonify({"error": "Forbidden"}), 403
+        return jsonify({"error": "You do not have permission to delete this item"}), 403
+
     item.archived_at = datetime.utcnow()
     try:
         db.session.commit()
-    except Exception as e:
+    except Exception as exc:
         db.session.rollback()
-        logger.error("Failed to delete item: %s", e)
-        return jsonify({"error": "Database error"}), 500
+        logger.error("Failed to delete item %s: %s", item_id, exc)
+        return jsonify({"error": "Could not delete item, please try again"}), 500
     return jsonify({"message": "Archived"})

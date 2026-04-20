@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { ClothingItem } from '../types';
-import { detectionApi } from '../api/detection';
+import { Detection, detectionApi } from '../api/detection';
 
+/** Holds the latest detector results plus loading/error state. */
 export function useDetection() {
   const [isDetecting, setIsDetecting] = useState(false);
-  const [detectedItems, setDetectedItems] = useState<ClothingItem[]>([]);
+  const [detectedItems, setDetectedItems] = useState<Detection[]>([]);
   const [apiError, setApiError] = useState<string | null>(null);
   const [noDetectionMsg, setNoDetectionMsg] = useState(false);
 
@@ -15,14 +15,14 @@ export function useDetection() {
     try {
       const data = await detectionApi.detect(imageB64);
       if (data.detections?.length > 0) {
-        setDetectedItems(data.detections as ClothingItem[]);
+        setDetectedItems(data.detections);
       } else {
         setDetectedItems([]);
         setNoDetectionMsg(true);
         setTimeout(() => setNoDetectionMsg(false), 3000);
       }
-    } catch (err: any) {
-      setApiError(err.message || 'Failed to connect to detection server');
+    } catch (err: unknown) {
+      setApiError(err instanceof Error ? err.message : 'Failed to connect to detection server');
     } finally {
       setIsDetecting(false);
     }

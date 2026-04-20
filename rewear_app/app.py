@@ -108,4 +108,5 @@ app = create_app()
 
 if __name__ == "__main__":
     _port = int(os.environ.get('BACKEND_PORT', 5001))
-    app.run(debug=not _production, port=_port)
+    _is_production = os.environ.get('PRODUCTION', '').lower() in ('1', 'true', 'yes')
+    app.run(debug=not _is_production, port=_port)

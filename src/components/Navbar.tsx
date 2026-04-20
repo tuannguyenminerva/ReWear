@@ -24,15 +24,17 @@ export const Navbar: React.FC = () => {
       </div>
 
       {user && (
+        // Order updated after the 3rd user interview: Insights now precedes
+        // Wardrobe so users can access their stats more quickly.
         <div className="flex items-center gap-8">
           <NavLink to="/" className={linkClass}>
             <span className="text-xs font-bold uppercase tracking-widest">Log a look</span>
           </NavLink>
-          <NavLink to="/wardrobe" className={linkClass}>
-            <span className="text-xs font-bold uppercase tracking-widest">Wardrobe</span>
-          </NavLink>
           <NavLink to="/insights" className={linkClass}>
             <span className="text-xs font-bold uppercase tracking-widest">Insights</span>
+          </NavLink>
+          <NavLink to="/wardrobe" className={linkClass}>
+            <span className="text-xs font-bold uppercase tracking-widest">Wardrobe</span>
           </NavLink>
           <NavLink to="/instructions" className={linkClass}>
             <span className="text-xs font-bold uppercase tracking-widest">Instructions</span>

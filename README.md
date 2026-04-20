@@ -89,9 +89,10 @@ the server.
 
 ### 4. Start the Flask backend
 
+Run from the project root (the `rewear_app` package uses relative imports, so it must be invoked as a module):
+
 ```bash
-cd rewear_app
-python app.py
+python -m rewear_app.app
 # Backend runs at http://localhost:5001
 ```
 
@@ -120,6 +121,14 @@ Unit tests were added for the backend Flask application and cover:
 - Serialization helpers for API responses
 
 Detailed instructions and the full test suite summary are available in [TESTING.md](TESTING.md) and [tests/README.md](tests/README.md).
+
+---
+
+## #designthinking
+
+The ReWear team ran three interview rounds tied to progressively maturing product stages. Interview I (February, 11 respondents, concept stage) validated the core premise and converted user feedback into a feature-vote table that set MVP 1 scope (PR #12), also correcting the team's assumption that users had a strong preference between scanning and photo upload. Interview II (March, 2 respondents, working MVP) surfaced visual polish concerns and seasonal context limitations that directly drove the MVP 2 redesign (PR #19) and the "Postpone until" feature. Interview III (April, 4 respondents, near-final build) closed the loop, the redesign was praised and two final-sprint bugs were identified, culminating in MVP 3 (PR #26). The ~70% camera detection accuracy was acknowledged as a technical ceiling beyond CS162 scope.
+
+Read more in [docs/README.md](docs/README.md).
 
 ---
 
@@ -155,14 +164,6 @@ Each action takes about 10 seconds. As data is gathered, the app reveals insight
 - **After two weeks:** The app highlights which items appear most frequently in outfits
 - **After one month:** Users receive a high-level wardrobe utilization score showing how much of their closet is actually being used
 
-### MVP Features (15-week scope)
-
-- Fast, mobile-optimized outfit photo uploads
-- AI-assisted item tagging with user confirmation
-- Usage dashboard showing wear frequency per item and total unique items worn
-- Simple outfit history timeline
-- Weekly reminders highlighting "forgotten favs" (items not worn in 30+ days)
-
 An optional one-time closet log can be used to set a baseline, but it is not required for the web app to function.
 
 # Target Audience
@@ -181,19 +182,3 @@ Target users are students and young adults (Gen Z, ages 18–34) interested in f
 - People experimenting with capsule wardrobes
 - Individuals casually tracking clothing habits
 
-# Feasibility
-
-The project is feasible for a small team working part-time. Rewear relies on straightforward analytics (counting item occurrences in outfit logs), which makes the system easy to implement and debug.
-
-Development can proceed within **15 weeks**:
-
-- **Early weeks:** Setting up a simple, mobile-responsive frontend and core data structures
-- **Middle phase:** Outfit logging, item tagging, and usage aggregation
-- **Later weeks:** Visual analytics, basic recommendations, and light AI assistance for tagging
-- **Final phase:** Testing
-
-**Technical stack:**
-
-- Python/Flask backend with SQLAlchemy (SQLite)
-- YOLO-based computer vision for clothing detection
-- React + TypeScript frontend with Vite

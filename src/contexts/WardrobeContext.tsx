@@ -88,14 +88,15 @@ export const WardrobeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setWardrobe(prev => prev.filter(item => item.id !== id));
   }, []);
 
-  // Postpone persists to backend
+  // Persists a "remind me later" date so the item drops out of the
+  // forgotten-items list until the chosen date.
   const postponeItem = useCallback(async (itemId: string, date: string) => {
     try {
-      const apiItem = await itemsApi.update(itemId, { postponedUntil: date } as any);
+      const apiItem = await itemsApi.update(itemId, { postponedUntil: date });
       const clothingItem = apiItemToClothing(apiItem);
       setWardrobe(prev => prev.map(item => item.id === itemId ? clothingItem : item));
     } catch (err) {
-      console.error(err);
+      console.error('Failed to postpone item reminder:', err);
     }
   }, []);
 
