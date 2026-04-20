@@ -16,7 +16,7 @@ export const MostWornCard: React.FC<MostWornCardProps> = ({ item, onShowDetails 
       <>
         <h3 className="text-sm font-bold text-stone-800 mb-3">{item.name}</h3>
         <div className="flex-1 rounded-lg overflow-hidden mb-3 bg-stone-50 border border-stone-100">
-          <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+          <img src={item.image || '/placeholder-garment.svg'} alt={item.name} className="w-full h-full object-cover" />
         </div>
         <div className="flex justify-between items-end">
           <div>
