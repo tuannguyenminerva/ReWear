@@ -6,13 +6,13 @@ from pathlib import Path
 
 import pytest
 
-# Add rewear_app to path so imports work
-rewear_app_path = os.path.join(os.path.dirname(__file__), '..', 'rewear_app')
-if rewear_app_path not in sys.path:
-    sys.path.insert(0, rewear_app_path)
+# Add project root to path rather than rewear_app directly
+project_root = os.path.join(os.path.dirname(__file__), '..')
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
-# Import create_app instead of the global app instance
-from app import db, create_app 
+# Import create_app and db using the fully qualified package name
+from rewear_app.app import db, create_app 
 
 
 @pytest.fixture
@@ -23,7 +23,8 @@ def app():
     app = create_app({
         'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
         'TESTING': True,
-        'WTF_CSRF_ENABLED': False
+        'WTF_CSRF_ENABLED': False,
+        'SECRET_KEY': 'test-secret'
     })
     
     with app.app_context():

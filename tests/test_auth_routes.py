@@ -5,7 +5,7 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'rewear_app'))
 
-from models import User, db
+from rewear_app.models import User, db
 
 
 class TestAuthRegister:

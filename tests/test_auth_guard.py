@@ -4,8 +4,8 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'rewear_app'))
 
-from models import User, db
-from auth_guard import require_auth
+from rewear_app.models import User, db
+from rewear_app.auth_guard import require_auth
 
 
 class TestRequireAuth:
@@ -13,7 +13,7 @@ class TestRequireAuth:
 
     def test_require_auth_no_session(self, app):
         """Test require_auth fails when not authenticated."""
-        with app.app_context():
+        with app.test_request_context():
             user, error = require_auth()
             assert user is None
             assert error is not None

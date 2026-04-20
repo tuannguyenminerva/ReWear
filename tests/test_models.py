@@ -5,7 +5,7 @@ import os
 from datetime import datetime, date
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'rewear_app'))
 
-from models import User, Item, ItemTag, Outfit, OutfitItem, Reminder, db
+from rewear_app.models import User, Item, ItemTag, Outfit, OutfitItem, Reminder, db
 
 
 class TestUserModel:
