@@ -92,7 +92,7 @@ The team assumed users would have a strong preference between real-time scanning
 **When:** March 31, 2026 (questions created March 11; form completed March 18; results discussed April 4)  
 **Where:** Mixed,  in-person and remote  
 **Who conducted:** Shichang Zhang and Tuan  
-**Participants:** 2 respondents
+**Participants:** 3 respondents
 
 ---
 
