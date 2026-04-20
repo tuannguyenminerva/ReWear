@@ -13,8 +13,8 @@ interface ItemFactsGridProps {
 }
 
 const formatCostPerWear = (cost: number | undefined, wearCount: number) => {
-  if (cost && wearCount > 0) return `$${(cost / wearCount).toFixed(2)}`;
-  if (cost) return `$${cost.toFixed(2)}`;
+  if (cost != null && wearCount > 0) return `$${(cost / wearCount).toFixed(2)}`;
+  if (cost != null) return `$${cost.toFixed(2)}`;
   return 'N/A';
 };
 
